@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isObscure = true;
 
   void _login() {
-    if (_passCtrl.text == 'BBT-2025') {
+    if (_passCtrl.text.trim() == 'BBT-2025') {
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
@@ -74,29 +74,36 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blue[900],
+      backgroundColor: const Color(0xFF0D47A1), // Azul oscuro
       body: Center(
         child: Card(
           margin: const EdgeInsets.all(24),
           elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.lock_outline, size: 64, color: Colors.blue),
+                const Icon(
+                  Icons.lock_outline,
+                  size: 64,
+                  color: Color(0xFF1E88E5),
+                ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Acceso al Sistema',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  'Sistema Licorería',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
                 TextField(
                   controller: _passCtrl,
                   obscureText: _isObscure,
                   decoration: InputDecoration(
-                    labelText: 'Contraseña',
-                    prefixIcon: const Icon(Icons.key),
+                    labelText: 'Contraseña de Acceso',
+                    prefixIcon: const Icon(Icons.vpn_key),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _isObscure ? Icons.visibility : Icons.visibility_off,
@@ -106,8 +113,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   onSubmitted: (_) => _login(),
                 ),
-                const SizedBox(height: 20),
-                FilledButton(onPressed: _login, child: const Text('INGRESAR')),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _login,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('INGRESAR AL SISTEMA'),
+                ),
               ],
             ),
           ),
@@ -118,7 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // --- MODELOS DE DATOS ---
-
 class Invoice {
   final int id;
   final String? docNumber;
@@ -176,7 +191,6 @@ class Invoice {
 }
 
 // --- PANTALLA PRINCIPAL ---
-
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -216,8 +230,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// --- LISTA DE FACTURAS ---
-
+// --- LISTA DE FACTURAS (CON REFRESCO AUTOMÁTICO) ---
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
   @override
@@ -227,29 +240,40 @@ class InvoiceListScreen extends StatefulWidget {
 class _InvoiceListScreenState extends State<InvoiceListScreen> {
   final _supabase = Supabase.instance.client;
   String _searchQuery = '';
+  late Stream<List<Map<String, dynamic>>> _currentStream;
 
-  Stream<List<Map<String, dynamic>>> _getInvoicesStream() {
-    return _supabase
-        .from('invoices')
-        .stream(primaryKey: ['id'])
-        .order('invoice_date', ascending: false)
-        .asyncMap((invoices) async {
-          final invoicesWithPayments = await Future.wait(
-            invoices.map((inv) async {
-              final payments = await _supabase
-                  .from('payments')
-                  .select('amount')
-                  .eq('invoice_id', inv['id']);
+  @override
+  void initState() {
+    super.initState();
+    _refreshStream();
+  }
 
-              double totalPaid = 0;
-              for (var p in payments) {
-                totalPaid += (p['amount'] as num).toDouble();
-              }
-              return {...inv, 'total_paid': totalPaid};
-            }),
-          );
-          return invoicesWithPayments;
-        });
+  // Genera el stream. Llamamos a esto para forzar un recalculo de pagos
+  void _refreshStream() {
+    setState(() {
+      _currentStream = _supabase
+          .from('invoices')
+          .stream(primaryKey: ['id'])
+          .order('invoice_date', ascending: false)
+          .asyncMap((invoices) async {
+            // Buscamos los pagos frescos para cada factura
+            final invoicesWithPayments = await Future.wait(
+              invoices.map((inv) async {
+                final payments = await _supabase
+                    .from('payments')
+                    .select('amount')
+                    .eq('invoice_id', inv['id']);
+
+                double totalPaid = 0;
+                for (var p in payments) {
+                  totalPaid += (p['amount'] as num).toDouble();
+                }
+                return {...inv, 'total_paid': totalPaid};
+              }),
+            );
+            return invoicesWithPayments;
+          });
+    });
   }
 
   @override
@@ -270,7 +294,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: TextField(
                   decoration: InputDecoration(
-                    hintText: 'Buscar...',
+                    hintText: 'Buscar proveedor, número...',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: Colors.white,
@@ -286,7 +310,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             ),
           ),
           StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _getInvoicesStream(),
+            stream: _currentStream,
             builder: (context, snapshot) {
               if (snapshot.hasError)
                 return SliverToBoxAdapter(
@@ -310,8 +334,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     doc.contains(_searchQuery);
               }).toList();
 
+              // Cálculo de Deuda Total Global
               double totalDebtUsd = 0;
-
               for (var item in filteredData) {
                 final inv = Invoice.fromMap(item);
                 final paid = (item['total_paid'] as num).toDouble();
@@ -341,16 +365,18 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
               return SliverList(
                 delegate: SliverChildListDelegate([
+                  // TARJETA DE DEUDA GLOBAL
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     child: Container(
-                      width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                        ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -387,7 +413,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Icon(
@@ -400,6 +426,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                       ),
                     ),
                   ),
+
+                  // LISTA
                   ...filteredData.map((item) {
                     final invoice = Invoice.fromMap(item);
                     final totalPaid = (item['total_paid'] as num).toDouble();
@@ -427,50 +455,69 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        invoice.provider,
-                                        style: const TextStyle(
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          invoice.provider,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          DateFormat(
+                                            'dd MMM yyyy',
+                                          ).format(invoice.date),
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isPaid)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green[50],
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'PAGADA',
+                                        style: TextStyle(
+                                          fontSize: 10,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                          color: Colors.green,
                                         ),
                                       ),
-                                      Text(
-                                        DateFormat(
-                                          'dd MMM yyyy',
-                                        ).format(invoice.date),
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red[50],
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'PENDIENTE',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: invoice.type == 'Factura'
-                                          ? Colors.purple[50]
-                                          : Colors.orange[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      invoice.type,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: invoice.type == 'Factura'
-                                            ? Colors.purple
-                                            : Colors.orange[800],
-                                      ),
-                                    ),
-                                  ),
                                 ],
                               ),
                               const Divider(height: 20),
@@ -478,66 +525,23 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Monto Neto',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      Text(
-                                        '${invoice.currency} ${invoice.totalPayable.toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
+                                  const Text(
+                                    'Saldo Pendiente:',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        isPaid ? 'PAGADO' : 'PENDIENTE',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: isPaid
-                                              ? Colors.green
-                                              : Colors.red,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${invoice.currency} ${balance.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                          color: isPaid
-                                              ? Colors.green
-                                              : Colors.red,
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    '${invoice.currency} ${balance.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: isPaid ? Colors.green : Colors.red,
+                                    ),
                                   ),
                                 ],
                               ),
-                              if (invoice.currency == 'Bs' &&
-                                  invoice.exchangeRate != null &&
-                                  balance > 0)
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    '~ \$${(balance / invoice.exchangeRate!).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
                               if (!isPaid) ...[
                                 const SizedBox(height: 12),
                                 Row(
@@ -587,14 +591,21 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showInvoiceForm(context),
-        label: const Text('Nueva'),
+        label: const Text('Nueva Cuenta'),
         icon: const Icon(Icons.add),
       ),
     );
   }
 
-  void _showInvoiceForm(BuildContext context, {Invoice? invoice}) {
-    showModalBottomSheet(
+  // --- MÉTODOS DE APERTURA DE MODALES CON REFRESCAMIENTO ---
+  // Al usar await y luego _refreshStream(), garantizamos que la lista se actualice
+  // en cuanto se cierre el modal, sin importar si guardaron, borraron o cancelaron.
+
+  Future<void> _showInvoiceForm(
+    BuildContext context, {
+    Invoice? invoice,
+  }) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -604,40 +615,37 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       ),
       builder: (context) => InvoiceForm(existingInvoice: invoice),
     );
+    _refreshStream(); // Refrescar al volver
   }
 
-  void _showPaymentModal(
+  Future<void> _showPaymentModal(
     BuildContext context, {
     required Invoice invoice,
     required double maxAmount,
-    Map<String, dynamic>? paymentToEdit,
-  }) {
-    showModalBottomSheet(
+  }) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: PaymentDialog(
-          invoice: invoice,
-          maxAmount: maxAmount,
-          existingPayment: paymentToEdit, // Pasamos el abono si vamos a editar
-        ),
+        child: PaymentDialog(invoice: invoice, maxAmount: maxAmount),
       ),
     );
+    _refreshStream(); // Refrescar al volver
   }
 
-  void _showDetail(BuildContext context, Invoice invoice) {
-    showDialog(
+  Future<void> _showDetail(BuildContext context, Invoice invoice) async {
+    await showDialog(
       context: context,
       builder: (context) => InvoiceDetailDialog(invoice: invoice),
     );
+    _refreshStream(); // Refrescar al cerrar el detalle (por si borraron abonos)
   }
 }
 
 // --- FORMULARIO DE FACTURA ---
-
 class InvoiceForm extends StatefulWidget {
   final Invoice? existingInvoice;
   const InvoiceForm({super.key, this.existingInvoice});
@@ -983,7 +991,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
 }
 
 // --- CONFIGURACIÓN ---
-
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
   @override
@@ -1180,7 +1187,7 @@ class _GenericConfigListState extends State<GenericConfigList> {
 class PaymentDialog extends StatefulWidget {
   final Invoice invoice;
   final double maxAmount;
-  final Map<String, dynamic>? existingPayment; // Opcional para edición
+  final Map<String, dynamic>? existingPayment;
 
   const PaymentDialog({
     super.key,
@@ -1204,7 +1211,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
     super.initState();
     _fetchMethods();
     if (widget.existingPayment != null) {
-      // Cargar datos si es edición
       _amountCtrl.text = widget.existingPayment!['amount'].toString();
       _paymentDate = DateTime.parse(widget.existingPayment!['payment_date']);
       _method = widget.existingPayment!['method'];
@@ -1234,16 +1240,13 @@ class _PaymentDialogState extends State<PaymentDialog> {
       };
 
       if (widget.existingPayment != null) {
-        // ACTUALIZAR (UPDATE)
         await Supabase.instance.client
             .from('payments')
             .update(paymentData)
             .eq('id', widget.existingPayment!['id']);
       } else {
-        // CREAR (INSERT)
         await Supabase.instance.client.from('payments').insert(paymentData);
       }
-
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted)
@@ -1255,8 +1258,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // Si estamos editando, el saldo es irrelevante porque ya se pagó parte,
-    // pero si es nuevo, mostramos cuánto debe.
     bool isEditing = widget.existingPayment != null;
 
     return Container(
@@ -1275,7 +1276,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-
           if (!isEditing)
             Container(
               padding: const EdgeInsets.all(12),
@@ -1300,7 +1300,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 ],
               ),
             ),
-
           const SizedBox(height: 20),
           InkWell(
             onTap: () async {
@@ -1352,14 +1351,12 @@ class _PaymentDialogState extends State<PaymentDialog> {
 }
 
 // --- DETALLE DE FACTURA E HISTORIAL ACTUALIZADO ---
-
 class InvoiceDetailDialog extends StatelessWidget {
   final Invoice invoice;
   const InvoiceDetailDialog({super.key, required this.invoice});
 
   @override
   Widget build(BuildContext context) {
-    // STREAM DE LA DB: Esto asegura que todo cambio (edit/delete) se refleje AL INSTANTE
     final stream = Supabase.instance.client
         .from('payments')
         .stream(primaryKey: ['id'])
@@ -1375,7 +1372,6 @@ class InvoiceDetailDialog extends StatelessWidget {
         child: StreamBuilder<List<Map<String, dynamic>>>(
           stream: stream,
           builder: (context, snapshot) {
-            // Mientras carga, mostramos spinner
             if (!snapshot.hasData)
               return const Padding(
                 padding: EdgeInsets.all(50),
