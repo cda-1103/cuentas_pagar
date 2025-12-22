@@ -169,6 +169,7 @@ class Invoice {
   final double baseAmount;
   final bool hasIva;
   final double manualIva;
+  final double liquorTax; // NUEVO CAMPO: Impuesto al Licor
   final bool retentionApplies;
   final String? notes;
 
@@ -183,6 +184,7 @@ class Invoice {
     required this.baseAmount,
     required this.hasIva,
     required this.manualIva,
+    required this.liquorTax,
     required this.retentionApplies,
     this.notes,
   });
@@ -197,7 +199,8 @@ class Invoice {
   // LÓGICA CORREGIDA: Si es Nota, NO suma IVA
   double get totalPayable {
     double ivaToSum = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
-    double totalFacial = baseAmount + ivaToSum;
+    // Sumamos el Impuesto al Licor al total facial
+    double totalFacial = baseAmount + ivaToSum + liquorTax;
     return totalFacial - retentionAmount;
   }
 
@@ -215,6 +218,8 @@ class Invoice {
       baseAmount: (map['base_amount'] as num).toDouble(),
       hasIva: map['has_iva'] ?? false,
       manualIva: (map['manual_iva'] as num?)?.toDouble() ?? 0.0,
+      liquorTax:
+          (map['liquor_tax'] as num?)?.toDouble() ?? 0.0, // Leer nuevo campo
       retentionApplies: map['retention_applies'] ?? false,
       notes: map['notes'],
     );
@@ -689,9 +694,10 @@ class _InvoiceFormState extends State<InvoiceForm> {
   final _docCtrl = TextEditingController();
   final _baseCtrl = TextEditingController();
   final _ivaCtrl = TextEditingController();
+  final _liquorTaxCtrl =
+      TextEditingController(); // NUEVO: Controlador para Impuesto Licor
   final _notesCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
-  // Controlador para el Autocomplete de Proveedores
   final TextEditingController _providerTypeAheadCtrl = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
@@ -711,10 +717,13 @@ class _InvoiceFormState extends State<InvoiceForm> {
       final inv = widget.existingInvoice!;
       _docCtrl.text = inv.docNumber ?? '';
       _selectedProvider = inv.provider;
-      _providerTypeAheadCtrl.text = inv.provider; // Inicializar Autocomplete
+      _providerTypeAheadCtrl.text = inv.provider;
 
       _baseCtrl.text = inv.baseAmount.toString();
       _ivaCtrl.text = inv.manualIva.toString();
+      _liquorTaxCtrl.text = inv.liquorTax > 0
+          ? inv.liquorTax.toString()
+          : ''; // Llenar si existe
       _notesCtrl.text = inv.notes ?? '';
       _rateCtrl.text = inv.exchangeRate?.toString() ?? '';
       _selectedDate = inv.date;
@@ -738,14 +747,12 @@ class _InvoiceFormState extends State<InvoiceForm> {
   }
 
   void _calculateIva() {
-    // CORRECCION: Solo calcular si es Factura Y tiene IVA activo
     if (_type == 'Factura' && _hasIva && _baseCtrl.text.isNotEmpty) {
       final base = double.tryParse(_baseCtrl.text) ?? 0;
       setState(() {
         _ivaCtrl.text = (base * 0.16).toStringAsFixed(2);
       });
     } else {
-      // Si no aplica, limpiar el campo visualmente para evitar confusión
       if (_ivaCtrl.text.isNotEmpty && (!_hasIva || _type == 'Nota')) {
         _ivaCtrl.text = '0.00';
       }
@@ -755,7 +762,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Obtener proveedor desde el Autocomplete si no se seleccionó explicitamente uno
     final providerToSave = _selectedProvider ?? _providerTypeAheadCtrl.text;
     if (providerToSave.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -767,13 +773,14 @@ class _InvoiceFormState extends State<InvoiceForm> {
     setState(() => _loading = true);
 
     try {
-      // CORRECCION: Forzar valores en 0 si es Nota
       final isNota = _type == 'Nota';
       final finalHasIva = isNota ? false : _hasIva;
       final finalRetention = isNota ? false : _retentionApplies;
       final finalManualIva = (isNota || !finalHasIva)
           ? 0.0
           : double.parse(_ivaCtrl.text.isEmpty ? '0' : _ivaCtrl.text);
+      final finalLiquorTax =
+          double.tryParse(_liquorTaxCtrl.text) ?? 0.0; // Obtener Impuesto Licor
 
       final data = {
         'doc_number': _docCtrl.text,
@@ -787,6 +794,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
         'base_amount': double.parse(_baseCtrl.text),
         'has_iva': finalHasIva,
         'manual_iva': finalManualIva,
+        'liquor_tax': finalLiquorTax, // Guardar
         'retention_applies': finalRetention,
         'notes': _notesCtrl.text,
       };
@@ -866,7 +874,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
             ),
             const SizedBox(height: 16),
 
-            // BUSCADOR INTELIGENTE DE PROVEEDORES
             Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) {
                 if (textEditingValue.text == '') {
@@ -886,12 +893,10 @@ class _InvoiceFormState extends State<InvoiceForm> {
               },
               fieldViewBuilder:
                   (context, controller, focusNode, onEditingComplete) {
-                    // Sincronizar controlador interno si es la primera vez (edición)
                     if (controller.text.isEmpty &&
                         _providerTypeAheadCtrl.text.isNotEmpty) {
                       controller.text = _providerTypeAheadCtrl.text;
                     }
-                    // Actualizar variable al escribir
                     controller.addListener(() {
                       _selectedProvider = controller.text;
                       _providerTypeAheadCtrl.text = controller.text;
@@ -923,7 +928,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
                         .toList(),
                     onChanged: (v) => setState(() {
                       _type = v!;
-                      // Si cambia a nota, desactivamos IVA visualmente
                       if (_type == 'Nota') {
                         _hasIva = false;
                         _retentionApplies = false;
@@ -949,7 +953,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _rateCtrl,
-                inputFormatters: [DecimalInputFormatter()], // FIX COMAS
+                inputFormatters: [DecimalInputFormatter()],
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -962,20 +966,35 @@ class _InvoiceFormState extends State<InvoiceForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _baseCtrl,
-              inputFormatters: [DecimalInputFormatter()], // FIX COMAS
+              inputFormatters: [DecimalInputFormatter()],
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
-                labelText: 'Monto Base',
+                labelText: 'Monto Base (Subtotal)',
                 prefixText: _currency == 'USD' ? '\$ ' : 'Bs ',
               ),
               onChanged: (_) => _calculateIva(),
               validator: (v) => v!.isEmpty ? 'Requerido' : null,
             ),
 
-            // OPCIONES FISCALES (Solo si es Factura)
+            // CAMPO DE IMPUESTO AL LICOR
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _liquorTaxCtrl,
+              inputFormatters: [DecimalInputFormatter()],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Impuesto al Licor (Opcional)',
+                prefixIcon: const Icon(Icons.liquor), // Un icono apropiado
+                prefixText: _currency == 'USD' ? '\$ ' : 'Bs ',
+                helperText: 'Impuesto adicional fuera de la base imponible',
+              ),
+            ),
+
             if (_type == 'Factura') ...[
               const SizedBox(height: 16),
               Container(
@@ -995,13 +1014,13 @@ class _InvoiceFormState extends State<InvoiceForm> {
                       value: _hasIva,
                       onChanged: (v) => setState(() {
                         _hasIva = v;
-                        _calculateIva(); // Recalcula (limpia si es false)
+                        _calculateIva();
                       }),
                     ),
                     if (_hasIva) ...[
                       TextFormField(
                         controller: _ivaCtrl,
-                        inputFormatters: [DecimalInputFormatter()], // FIX COMAS
+                        inputFormatters: [DecimalInputFormatter()],
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -1468,7 +1487,7 @@ class InvoiceDetailDialog extends StatelessWidget {
     // Si es Nota, el total es el monto base (sin IVA, sin retencion)
     final double totalFacial = invoice.type == 'Nota'
         ? invoice.baseAmount
-        : invoice.baseAmount + invoice.manualIva;
+        : invoice.baseAmount + invoice.manualIva + invoice.liquorTax;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1552,6 +1571,15 @@ class InvoiceDetailDialog extends StatelessWidget {
                             'IVA 16% (+)',
                             invoice.manualIva,
                             invoice.currency,
+                          ),
+
+                        // MOSTRAR IMPUESTO LICOR SI EXISTE
+                        if (invoice.liquorTax > 0)
+                          _row(
+                            'Impuesto Licor (+)',
+                            invoice.liquorTax,
+                            invoice.currency,
+                            color: Colors.purple,
                           ),
 
                         const Padding(
