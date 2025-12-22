@@ -468,6 +468,17 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        // MODIFICACIÓN AQUÍ: Se agrega el número de documento
+                                        if (invoice.docNumber != null &&
+                                            invoice.docNumber!.isNotEmpty)
+                                          Text(
+                                            '#${invoice.docNumber}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
                                         Text(
                                           DateFormat(
                                             'dd MMM yyyy',
