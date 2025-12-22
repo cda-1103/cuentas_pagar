@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Necesario para el fix de comas
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
@@ -13,6 +14,29 @@ Future<void> main() async {
   );
 
   runApp(const MyApp());
+}
+
+// --- HERRAMIENTA MAGICA PARA COMAS Y PUNTOS ---
+// Esta clase convierte automáticamente las comas en puntos mientras escribes
+class DecimalInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // 1. Reemplaza cualquier coma por punto
+    String newText = newValue.text.replaceAll(',', '.');
+
+    // 2. Evita que el usuario escriba más de un punto (ej: 10..5)
+    if ('.'.allMatches(newText).length > 1) {
+      return oldValue;
+    }
+
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -248,7 +272,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     _refreshStream();
   }
 
-  // Genera el stream. Llamamos a esto para forzar un recalculo de pagos
   void _refreshStream() {
     setState(() {
       _currentStream = _supabase
@@ -256,7 +279,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           .stream(primaryKey: ['id'])
           .order('invoice_date', ascending: false)
           .asyncMap((invoices) async {
-            // Buscamos los pagos frescos para cada factura
             final invoicesWithPayments = await Future.wait(
               invoices.map((inv) async {
                 final payments = await _supabase
@@ -334,7 +356,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     doc.contains(_searchQuery);
               }).toList();
 
-              // Cálculo de Deuda Total Global
               double totalDebtUsd = 0;
               for (var item in filteredData) {
                 final inv = Invoice.fromMap(item);
@@ -365,7 +386,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
               return SliverList(
                 delegate: SliverChildListDelegate([
-                  // TARJETA DE DEUDA GLOBAL
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -426,8 +446,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                       ),
                     ),
                   ),
-
-                  // LISTA
                   ...filteredData.map((item) {
                     final invoice = Invoice.fromMap(item);
                     final totalPaid = (item['total_paid'] as num).toDouble();
@@ -468,7 +486,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        // MODIFICACIÓN AQUÍ: Se agrega el número de documento
                                         if (invoice.docNumber != null &&
                                             invoice.docNumber!.isNotEmpty)
                                           Text(
@@ -608,10 +625,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     );
   }
 
-  // --- MÉTODOS DE APERTURA DE MODALES CON REFRESCAMIENTO ---
-  // Al usar await y luego _refreshStream(), garantizamos que la lista se actualice
-  // en cuanto se cierre el modal, sin importar si guardaron, borraron o cancelaron.
-
   Future<void> _showInvoiceForm(
     BuildContext context, {
     Invoice? invoice,
@@ -626,7 +639,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       ),
       builder: (context) => InvoiceForm(existingInvoice: invoice),
     );
-    _refreshStream(); // Refrescar al volver
+    _refreshStream();
   }
 
   Future<void> _showPaymentModal(
@@ -644,7 +657,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         child: PaymentDialog(invoice: invoice, maxAmount: maxAmount),
       ),
     );
-    _refreshStream(); // Refrescar al volver
+    _refreshStream();
   }
 
   Future<void> _showDetail(BuildContext context, Invoice invoice) async {
@@ -652,7 +665,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       context: context,
       builder: (context) => InvoiceDetailDialog(invoice: invoice),
     );
-    _refreshStream(); // Refrescar al cerrar el detalle (por si borraron abonos)
+    _refreshStream();
   }
 }
 
@@ -866,6 +879,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _rateCtrl,
+                inputFormatters: [DecimalInputFormatter()], // FIX COMAS
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -878,6 +892,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _baseCtrl,
+              inputFormatters: [DecimalInputFormatter()], // FIX COMAS
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -914,6 +929,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
                     if (_hasIva) ...[
                       TextFormField(
                         controller: _ivaCtrl,
+                        inputFormatters: [DecimalInputFormatter()], // FIX COMAS
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
@@ -1287,6 +1303,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
+
           if (!isEditing)
             Container(
               padding: const EdgeInsets.all(12),
@@ -1311,6 +1328,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 ],
               ),
             ),
+
           const SizedBox(height: 20),
           InkWell(
             onTap: () async {
@@ -1333,6 +1351,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
           const SizedBox(height: 16),
           TextField(
             controller: _amountCtrl,
+            inputFormatters: [DecimalInputFormatter()], // FIX COMAS
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
