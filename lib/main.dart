@@ -187,10 +187,17 @@ class Invoice {
     this.notes,
   });
 
-  double get retentionAmount => retentionApplies ? manualIva * 0.75 : 0.0;
+  // LÓGICA CORREGIDA: Si es Nota, NO hay retención
+  double get retentionAmount {
+    if (type == 'Nota') return 0.0;
+    if (!hasIva) return 0.0;
+    return retentionApplies ? manualIva * 0.75 : 0.0;
+  }
 
+  // LÓGICA CORREGIDA: Si es Nota, NO suma IVA
   double get totalPayable {
-    double totalFacial = baseAmount + manualIva;
+    double ivaToSum = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
+    double totalFacial = baseAmount + ivaToSum;
     return totalFacial - retentionAmount;
   }
 
@@ -684,6 +691,8 @@ class _InvoiceFormState extends State<InvoiceForm> {
   final _ivaCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
+  // Controlador para el Autocomplete de Proveedores
+  final TextEditingController _providerTypeAheadCtrl = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
   String _type = 'Factura';
@@ -702,7 +711,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
       final inv = widget.existingInvoice!;
       _docCtrl.text = inv.docNumber ?? '';
       _selectedProvider = inv.provider;
-      _providersList = [inv.provider];
+      _providerTypeAheadCtrl.text = inv.provider; // Inicializar Autocomplete
 
       _baseCtrl.text = inv.baseAmount.toString();
       _ivaCtrl.text = inv.manualIva.toString();
@@ -723,32 +732,52 @@ class _InvoiceFormState extends State<InvoiceForm> {
         .order('name');
     if (mounted) {
       setState(() {
-        final fetched = (res as List).map((e) => e['name'] as String).toList();
-        if (_selectedProvider != null && !fetched.contains(_selectedProvider)) {
-          fetched.add(_selectedProvider!);
-        }
-        _providersList = fetched;
+        _providersList = (res as List).map((e) => e['name'] as String).toList();
       });
     }
   }
 
   void _calculateIva() {
-    if (_hasIva && _baseCtrl.text.isNotEmpty) {
+    // CORRECCION: Solo calcular si es Factura Y tiene IVA activo
+    if (_type == 'Factura' && _hasIva && _baseCtrl.text.isNotEmpty) {
       final base = double.tryParse(_baseCtrl.text) ?? 0;
       setState(() {
         _ivaCtrl.text = (base * 0.16).toStringAsFixed(2);
       });
+    } else {
+      // Si no aplica, limpiar el campo visualmente para evitar confusión
+      if (_ivaCtrl.text.isNotEmpty && (!_hasIva || _type == 'Nota')) {
+        _ivaCtrl.text = '0.00';
+      }
     }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Obtener proveedor desde el Autocomplete si no se seleccionó explicitamente uno
+    final providerToSave = _selectedProvider ?? _providerTypeAheadCtrl.text;
+    if (providerToSave.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingresa un proveedor')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     try {
+      // CORRECCION: Forzar valores en 0 si es Nota
+      final isNota = _type == 'Nota';
+      final finalHasIva = isNota ? false : _hasIva;
+      final finalRetention = isNota ? false : _retentionApplies;
+      final finalManualIva = (isNota || !finalHasIva)
+          ? 0.0
+          : double.parse(_ivaCtrl.text.isEmpty ? '0' : _ivaCtrl.text);
+
       final data = {
         'doc_number': _docCtrl.text,
-        'provider': _selectedProvider,
+        'provider': providerToSave,
         'invoice_date': _selectedDate.toIso8601String(),
         'type': _type,
         'currency': _currency,
@@ -756,9 +785,9 @@ class _InvoiceFormState extends State<InvoiceForm> {
             ? double.parse(_rateCtrl.text)
             : null,
         'base_amount': double.parse(_baseCtrl.text),
-        'has_iva': _hasIva,
-        'manual_iva': double.parse(_ivaCtrl.text.isEmpty ? '0' : _ivaCtrl.text),
-        'retention_applies': _retentionApplies,
+        'has_iva': finalHasIva,
+        'manual_iva': finalManualIva,
+        'retention_applies': finalRetention,
         'notes': _notesCtrl.text,
       };
 
@@ -836,19 +865,52 @@ class _InvoiceFormState extends State<InvoiceForm> {
               ],
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedProvider,
-              decoration: const InputDecoration(
-                labelText: 'Proveedor',
-                prefixIcon: Icon(Icons.store),
-              ),
-              items: _providersList
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedProvider = v),
-              validator: (v) => v == null ? 'Requerido' : null,
-              hint: const Text('Seleccione un proveedor'),
+
+            // BUSCADOR INTELIGENTE DE PROVEEDORES
+            Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text == '') {
+                  return const Iterable<String>.empty();
+                }
+                return _providersList.where((String option) {
+                  return option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                });
+              },
+              onSelected: (String selection) {
+                setState(() {
+                  _selectedProvider = selection;
+                  _providerTypeAheadCtrl.text = selection;
+                });
+              },
+              fieldViewBuilder:
+                  (context, controller, focusNode, onEditingComplete) {
+                    // Sincronizar controlador interno si es la primera vez (edición)
+                    if (controller.text.isEmpty &&
+                        _providerTypeAheadCtrl.text.isNotEmpty) {
+                      controller.text = _providerTypeAheadCtrl.text;
+                    }
+                    // Actualizar variable al escribir
+                    controller.addListener(() {
+                      _selectedProvider = controller.text;
+                      _providerTypeAheadCtrl.text = controller.text;
+                    });
+
+                    return TextFormField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onEditingComplete: onEditingComplete,
+                      decoration: const InputDecoration(
+                        labelText: 'Proveedor',
+                        prefixIcon: Icon(Icons.store),
+                        hintText: 'Escribe para buscar...',
+                      ),
+                      validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                    );
+                  },
             ),
+
             const SizedBox(height: 16),
             Row(
               children: [
@@ -859,7 +921,15 @@ class _InvoiceFormState extends State<InvoiceForm> {
                     items: ['Factura', 'Nota']
                         .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
-                    onChanged: (v) => setState(() => _type = v!),
+                    onChanged: (v) => setState(() {
+                      _type = v!;
+                      // Si cambia a nota, desactivamos IVA visualmente
+                      if (_type == 'Nota') {
+                        _hasIva = false;
+                        _retentionApplies = false;
+                        _ivaCtrl.text = '0.00';
+                      }
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -904,6 +974,8 @@ class _InvoiceFormState extends State<InvoiceForm> {
               onChanged: (_) => _calculateIva(),
               validator: (v) => v!.isEmpty ? 'Requerido' : null,
             ),
+
+            // OPCIONES FISCALES (Solo si es Factura)
             if (_type == 'Factura') ...[
               const SizedBox(height: 16),
               Container(
@@ -923,7 +995,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
                       value: _hasIva,
                       onChanged: (v) => setState(() {
                         _hasIva = v;
-                        _calculateIva();
+                        _calculateIva(); // Recalcula (limpia si es false)
                       }),
                     ),
                     if (_hasIva) ...[
@@ -1393,7 +1465,10 @@ class InvoiceDetailDialog extends StatelessWidget {
         .eq('invoice_id', invoice.id)
         .order('payment_date', ascending: false);
 
-    final double totalFacial = invoice.baseAmount + invoice.manualIva;
+    // Si es Nota, el total es el monto base (sin IVA, sin retencion)
+    final double totalFacial = invoice.type == 'Nota'
+        ? invoice.baseAmount
+        : invoice.baseAmount + invoice.manualIva;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1472,22 +1547,27 @@ class InvoiceDetailDialog extends StatelessWidget {
                           invoice.baseAmount,
                           invoice.currency,
                         ),
-                        _row(
-                          'IVA 16% (+)',
-                          invoice.manualIva,
-                          invoice.currency,
-                        ),
+                        if (invoice.type == 'Factura' && invoice.hasIva)
+                          _row(
+                            'IVA 16% (+)',
+                            invoice.manualIva,
+                            invoice.currency,
+                          ),
+
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 4),
                           child: Divider(),
                         ),
                         _row(
-                          'Total Factura (Facial)',
+                          'Total Facial (=)',
                           totalFacial,
                           invoice.currency,
                           isBold: true,
                         ),
-                        if (invoice.retentionApplies) ...[
+
+                        if (invoice.type == 'Factura' &&
+                            invoice.retentionApplies &&
+                            invoice.hasIva) ...[
                           const SizedBox(height: 8),
                           _row(
                             'Retención IVA 75% (-)',
