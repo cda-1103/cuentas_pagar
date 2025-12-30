@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CUentas Por Pagar',
+      title: 'Control Licorería',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Cuentas por Pagar',
+                  'Sistema Licorería',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('INGRESAR'),
+                  child: const Text('INGRESAR AL SISTEMA'),
                 ),
               ],
             ),
@@ -263,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// --- PANTALLA 2: RESUMEN POR PROVEEDOR (CON BÚSQUEDA) ---
+// --- PANTALLA 2: RESUMEN POR PROVEEDOR ---
 class ProviderSummaryScreen extends StatefulWidget {
   const ProviderSummaryScreen({super.key});
 
@@ -273,7 +273,7 @@ class ProviderSummaryScreen extends StatefulWidget {
 
 class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
   final _supabase = Supabase.instance.client;
-  String _providerSearchQuery = ''; // Búsqueda local de proveedores
+  String _providerSearchQuery = '';
 
   Stream<List<Map<String, dynamic>>> _getSummaryStream() {
     return _supabase.from('invoices').stream(primaryKey: ['id']).asyncMap((
@@ -362,7 +362,6 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
             }
           }
 
-          // FILTRADO LOCAL POR BUSQUEDA
           List<MapEntry<String, Map<String, dynamic>>> filteredProviders =
               providerStats.entries
                   .where(
@@ -383,7 +382,6 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
             );
           }
 
-          // Ordenar por deuda
           filteredProviders.sort(
             (a, b) => b.value['debtUSD'].compareTo(a.value['debtUSD']),
           );
@@ -508,6 +506,34 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         return invoicesWithPayments;
       });
     });
+  }
+
+  // FUNCIÓN PARA ELIMINAR DESDE LA LISTA
+  Future<void> _deleteInvoiceFromList(int id) async {
+    final confirm = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Borrar Factura?'),
+        content: const Text(
+          'Se eliminará la factura y todos sus abonos.\nEsta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _supabase.from('invoices').delete().eq('id', id);
+      _refreshStream(); // Recargar lista
+    }
   }
 
   @override
@@ -656,8 +682,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // CABECERA CON BOTÓN DE BORRAR
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
                               child: Column(
@@ -691,7 +719,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                     ),
                                   ),
 
-                                  // --- NOTA EN LA VISTA PREVIA ---
                                   if (invoice.notes != null &&
                                       invoice.notes!.isNotEmpty)
                                     Padding(
@@ -719,48 +746,67 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                         ],
                                       ),
                                     ),
-                                  // --------------------------------
                                 ],
                               ),
                             ),
-                            if (isPaid)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'PAGADA',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'PENDIENTE',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+
+                            // COLUMNA DERECHA: PAPELERA Y ESTADO
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                // BOTÓN DE ELIMINAR RÁPIDO
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
                                     color: Colors.red,
+                                    size: 24,
                                   ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () =>
+                                      _deleteInvoiceFromList(invoice.id),
                                 ),
-                              ),
+                                const SizedBox(height: 8),
+                                if (isPaid)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'PAGADA',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red[50],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'PENDIENTE',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                         const Divider(height: 20),
@@ -1290,6 +1336,8 @@ class _InvoiceFormState extends State<InvoiceForm> {
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('GUARDAR CUENTA'),
             ),
+
+            // ELIMINAR DESDE FORMULARIO (MANTENEMOS ESTA OPCIÓN TAMBIÉN)
             if (widget.existingInvoice != null) ...[
               const SizedBox(height: 16),
               TextButton.icon(
