@@ -16,7 +16,7 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-// --- HERRAMIENTA MAGICA PARA COMAS Y PUNTOS ---
+// --- HERRAMIENTA PARA COMAS Y PUNTOS ---
 class DecimalInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Control Licorería',
+      title: 'CUentas Por Pagar',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Sistema Licorería',
+                  'Cuentas por Pagar',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('INGRESAR AL SISTEMA'),
+                  child: const Text('INGRESAR'),
                 ),
               ],
             ),
@@ -263,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// --- PANTALLA 2: RESUMEN POR PROVEEDOR ---
+// --- PANTALLA 2: RESUMEN POR PROVEEDOR (CON BÚSQUEDA) ---
 class ProviderSummaryScreen extends StatefulWidget {
   const ProviderSummaryScreen({super.key});
 
@@ -273,9 +273,9 @@ class ProviderSummaryScreen extends StatefulWidget {
 
 class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
   final _supabase = Supabase.instance.client;
+  String _providerSearchQuery = ''; // Búsqueda local de proveedores
 
   Stream<List<Map<String, dynamic>>> _getSummaryStream() {
-    // Reutilizamos la lógica de traer facturas y pagos para calcular
     return _supabase.from('invoices').stream(primaryKey: ['id']).asyncMap((
       invoices,
     ) async {
@@ -304,6 +304,26 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
           'Deuda por Proveedor',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Buscar proveedor...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (val) =>
+                  setState(() => _providerSearchQuery = val.toLowerCase()),
+            ),
+          ),
+        ),
       ),
       backgroundColor: Colors.grey[100],
       body: StreamBuilder<List<Map<String, dynamic>>>(
@@ -316,9 +336,7 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
 
           final data = snapshot.data!;
 
-          // Agrupar por proveedor
-          Map<String, Map<String, dynamic>> providerStats =
-              {}; // { 'Polar': { 'debtUSD': 100, 'count': 2 } }
+          Map<String, Map<String, dynamic>> providerStats = {};
 
           for (var item in data) {
             final inv = Invoice.fromMap(item);
@@ -326,7 +344,6 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
             final balance = inv.totalPayable - paid;
 
             if (balance > 0.01) {
-              // Solo si hay deuda
               if (!providerStats.containsKey(inv.provider)) {
                 providerStats[inv.provider] = {'debtUSD': 0.0, 'count': 0};
               }
@@ -345,29 +362,37 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
             }
           }
 
-          if (providerStats.isEmpty) {
+          // FILTRADO LOCAL POR BUSQUEDA
+          List<MapEntry<String, Map<String, dynamic>>> filteredProviders =
+              providerStats.entries
+                  .where(
+                    (entry) =>
+                        entry.key.toLowerCase().contains(_providerSearchQuery),
+                  )
+                  .toList();
+
+          if (filteredProviders.isEmpty) {
             return const Center(
               child: Text(
-                '¡Excelente! No tienes deudas pendientes.',
+                'No hay deudas pendientes con ese criterio.',
                 style: TextStyle(
-                  color: Colors.green,
+                  color: Colors.grey,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             );
           }
 
-          // Convertir a lista y ordenar por mayor deuda
-          List<MapEntry<String, Map<String, dynamic>>> sortedProviders =
-              providerStats.entries.toList()..sort(
-                (a, b) => b.value['debtUSD'].compareTo(a.value['debtUSD']),
-              );
+          // Ordenar por deuda
+          filteredProviders.sort(
+            (a, b) => b.value['debtUSD'].compareTo(a.value['debtUSD']),
+          );
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: sortedProviders.length,
+            itemCount: filteredProviders.length,
             itemBuilder: (context, index) {
-              final entry = sortedProviders[index];
+              final entry = filteredProviders[index];
               final name = entry.key;
               final stats = entry.value;
 
@@ -419,18 +444,12 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
                     ],
                   ),
                   onTap: () {
-                    // NAVEGAR A LA VISTA FILTRADA DE ESTE PROVEEDOR
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => Scaffold(
-                          // Reutilizamos la misma pantalla de lista pero con un parámetro de filtro
-                          appBar: AppBar(
-                            title: Text(name),
-                          ), // AppBar simple para la subpantalla
-                          body: InvoiceListScreen(
-                            providerFilter: name,
-                          ), // Pasamos el filtro
+                          appBar: AppBar(title: Text(name)),
+                          body: InvoiceListScreen(providerFilter: name),
                         ),
                       ),
                     );
@@ -445,9 +464,9 @@ class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
   }
 }
 
-// --- LISTA DE FACTURAS (REUTILIZABLE Y FILTRABLE) ---
+// --- LISTA DE FACTURAS (REUTILIZABLE) ---
 class InvoiceListScreen extends StatefulWidget {
-  final String? providerFilter; // Parámetro opcional para filtrar
+  final String? providerFilter;
   const InvoiceListScreen({super.key, this.providerFilter});
 
   @override
@@ -472,10 +491,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           .stream(primaryKey: ['id'])
           .order('invoice_date', ascending: false);
 
-      // La libreria stream de supabase no soporta .eq() directo en el stream builder facilmente para filtros dinamicos complejos
-      // Lo manejaremos filtrando la data en memoria (rápido para < 5000 registros)
-      // O si preferimos, podríamos usar .eq si el filtro no cambia, pero para simplificar la UI reactiva:
-
       _currentStream = query.asyncMap((invoices) async {
         final invoicesWithPayments = await Future.wait(
           invoices.map((inv) async {
@@ -497,13 +512,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Si hay filtro de proveedor, no mostramos el Scaffold completo con AppBar de búsqueda
-    // porque ya estamos dentro de otra pantalla que tiene AppBar.
-    // Usaremos un widget contenedor.
-
-    // Si ES la pantalla principal (sin filtro), usamos Scaffold completo.
-    // Si TIENE filtro, devolvemos solo el contenido del body.
-
     Widget content = StreamBuilder<List<Map<String, dynamic>>>(
       stream: _currentStream,
       builder: (context, snapshot) {
@@ -519,15 +527,12 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
         final data = snapshot.data!;
 
-        // FILTRADO LOCAL
         final filteredData = data.where((inv) {
           final provider = inv['provider'].toString();
-          // 1. Filtro estricto de proveedor (si venimos de la pantalla de resumen)
           if (widget.providerFilter != null &&
               provider != widget.providerFilter) {
             return false;
           }
-          // 2. Filtro de búsqueda (si estamos en la pantalla principal)
           if (widget.providerFilter == null) {
             final search = _searchQuery.toLowerCase();
             final doc = inv['doc_number']?.toString().toLowerCase() ?? '';
@@ -537,7 +542,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           return true;
         }).toList();
 
-        // Cálculo de totales (Solo se muestran si NO estamos filtrando, o si queremos ver el total de ese proveedor)
         double totalDebtUsd = 0;
         for (var item in filteredData) {
           final inv = Invoice.fromMap(item);
@@ -566,9 +570,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         return ListView(
           padding: EdgeInsets.only(
             bottom: widget.providerFilter == null ? 80 : 20,
-          ), // Espacio para FAB solo si no hay filtro
+          ),
           children: [
-            // TARJETA DE RESUMEN (Visible siempre, muestra el total de lo que se ve en pantalla)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Container(
@@ -576,14 +579,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: widget.providerFilter != null
-                        ? [
-                            Colors.orange.shade800,
-                            Colors.deepOrange,
-                          ] // Naranja para modo proveedor
-                        : [
-                            const Color(0xFF1565C0),
-                            const Color(0xFF1E88E5),
-                          ], // Azul para modo general
+                        ? [Colors.orange.shade800, Colors.deepOrange]
+                        : [const Color(0xFF1565C0), const Color(0xFF1E88E5)],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
@@ -639,7 +636,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               ),
             ),
 
-            // LISTA DE FACTURAS
             ...filteredData.map((item) {
               final invoice = Invoice.fromMap(item);
               final totalPaid = (item['total_paid'] as num).toDouble();
@@ -694,6 +690,36 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                                       fontSize: 12,
                                     ),
                                   ),
+
+                                  // --- NOTA EN LA VISTA PREVIA ---
+                                  if (invoice.notes != null &&
+                                      invoice.notes!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.note,
+                                            size: 14,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              invoice.notes!,
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontStyle: FontStyle.italic,
+                                                fontSize: 12,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  // --------------------------------
                                 ],
                               ),
                             ),
@@ -803,7 +829,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       },
     );
 
-    // ESTRUCTURA FINAL: Si es modo filtro, solo devolvemos el contenido. Si es modo principal, devolvemos Scaffold.
     if (widget.providerFilter != null) {
       return Container(color: Colors.grey[100], child: content);
     }
@@ -1188,7 +1213,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
               validator: (v) => v!.isEmpty ? 'Requerido' : null,
             ),
 
-            // CAMPO DE IMPUESTO AL LICOR
             const SizedBox(height: 16),
             TextFormField(
               controller: _liquorTaxCtrl,
@@ -1528,6 +1552,7 @@ class PaymentDialog extends StatefulWidget {
 
 class _PaymentDialogState extends State<PaymentDialog> {
   final _amountCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController(); // NUEVO: Controlador para nota
   String? _method;
   DateTime _paymentDate = DateTime.now();
   List<String> _methodsList = [];
@@ -1541,6 +1566,8 @@ class _PaymentDialogState extends State<PaymentDialog> {
       _amountCtrl.text = widget.existingPayment!['amount'].toString();
       _paymentDate = DateTime.parse(widget.existingPayment!['payment_date']);
       _method = widget.existingPayment!['method'];
+      _noteCtrl.text =
+          widget.existingPayment!['note'] ?? ''; // Cargar nota existente
     }
   }
 
@@ -1564,6 +1591,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         'amount': double.parse(_amountCtrl.text),
         'method': _method,
         'payment_date': _paymentDate.toIso8601String(),
+        'note': _noteCtrl.text, // GUARDAR NOTA
       };
 
       if (widget.existingPayment != null) {
@@ -1651,7 +1679,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
           const SizedBox(height: 16),
           TextField(
             controller: _amountCtrl,
-            inputFormatters: [DecimalInputFormatter()], // FIX COMAS
+            inputFormatters: [DecimalInputFormatter()],
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
@@ -1668,6 +1696,15 @@ class _PaymentDialogState extends State<PaymentDialog> {
             onChanged: (v) => setState(() => _method = v),
             decoration: const InputDecoration(labelText: 'Método de Pago'),
             hint: const Text('Cargando métodos...'),
+          ),
+          const SizedBox(height: 16),
+          // NUEVO CAMPO DE NOTA
+          TextField(
+            controller: _noteCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nota del Abono (Opcional)',
+              prefixIcon: Icon(Icons.note),
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -1890,6 +1927,7 @@ class InvoiceDetailDialog extends StatelessWidget {
                             itemCount: payments.length,
                             itemBuilder: (context, index) {
                               final p = payments[index];
+                              // VISUALIZACION DE NOTA EN ABONOS
                               return ListTile(
                                 dense: true,
                                 contentPadding: EdgeInsets.zero,
@@ -1899,10 +1937,25 @@ class InvoiceDetailDialog extends StatelessWidget {
                                   size: 20,
                                 ),
                                 title: Text('${p['method']}'),
-                                subtitle: Text(
-                                  DateFormat(
-                                    'dd MMM yyyy',
-                                  ).format(DateTime.parse(p['payment_date'])),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      DateFormat('dd MMM yyyy').format(
+                                        DateTime.parse(p['payment_date']),
+                                      ),
+                                    ),
+                                    if (p['note'] != null &&
+                                        p['note'].toString().isNotEmpty)
+                                      Text(
+                                        p['note'],
+                                        style: const TextStyle(
+                                          fontStyle: FontStyle.italic,
+                                          color: Colors.grey,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
