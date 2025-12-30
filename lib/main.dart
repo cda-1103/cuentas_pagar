@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Necesario para el fix de comas
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
@@ -17,21 +17,16 @@ Future<void> main() async {
 }
 
 // --- HERRAMIENTA MAGICA PARA COMAS Y PUNTOS ---
-// Esta clase convierte automáticamente las comas en puntos mientras escribes
 class DecimalInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    // 1. Reemplaza cualquier coma por punto
     String newText = newValue.text.replaceAll(',', '.');
-
-    // 2. Evita que el usuario escriba más de un punto (ej: 10..5)
     if ('.'.allMatches(newText).length > 1) {
       return oldValue;
     }
-
     return newValue.copyWith(
       text: newText,
       selection: TextSelection.collapsed(offset: newText.length),
@@ -98,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1), // Azul oscuro
+      backgroundColor: const Color(0xFF0D47A1),
       body: Center(
         child: Card(
           margin: const EdgeInsets.all(24),
@@ -169,7 +164,7 @@ class Invoice {
   final double baseAmount;
   final bool hasIva;
   final double manualIva;
-  final double liquorTax; // NUEVO CAMPO: Impuesto al Licor
+  final double liquorTax;
   final bool retentionApplies;
   final String? notes;
 
@@ -189,17 +184,14 @@ class Invoice {
     this.notes,
   });
 
-  // LÓGICA CORREGIDA: Si es Nota, NO hay retención
   double get retentionAmount {
     if (type == 'Nota') return 0.0;
     if (!hasIva) return 0.0;
     return retentionApplies ? manualIva * 0.75 : 0.0;
   }
 
-  // LÓGICA CORREGIDA: Si es Nota, NO suma IVA
   double get totalPayable {
     double ivaToSum = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
-    // Sumamos el Impuesto al Licor al total facial
     double totalFacial = baseAmount + ivaToSum + liquorTax;
     return totalFacial - retentionAmount;
   }
@@ -218,8 +210,7 @@ class Invoice {
       baseAmount: (map['base_amount'] as num).toDouble(),
       hasIva: map['has_iva'] ?? false,
       manualIva: (map['manual_iva'] as num?)?.toDouble() ?? 0.0,
-      liquorTax:
-          (map['liquor_tax'] as num?)?.toDouble() ?? 0.0, // Leer nuevo campo
+      liquorTax: (map['liquor_tax'] as num?)?.toDouble() ?? 0.0,
       retentionApplies: map['retention_applies'] ?? false,
       notes: map['notes'],
     );
@@ -237,8 +228,9 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
   static const List<Widget> _pages = <Widget>[
-    InvoiceListScreen(),
-    SettingsScreen(),
+    InvoiceListScreen(), // Índice 0: Todas las cuentas
+    ProviderSummaryScreen(), // Índice 1: Resumen por Proveedor
+    SettingsScreen(), // Índice 2: Configuración
   ];
 
   @override
@@ -256,6 +248,11 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Cuentas',
           ),
           NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Proveedores',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Configuración',
@@ -266,9 +263,193 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// --- LISTA DE FACTURAS (CON REFRESCO AUTOMÁTICO) ---
+// --- PANTALLA 2: RESUMEN POR PROVEEDOR ---
+class ProviderSummaryScreen extends StatefulWidget {
+  const ProviderSummaryScreen({super.key});
+
+  @override
+  State<ProviderSummaryScreen> createState() => _ProviderSummaryScreenState();
+}
+
+class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
+  final _supabase = Supabase.instance.client;
+
+  Stream<List<Map<String, dynamic>>> _getSummaryStream() {
+    // Reutilizamos la lógica de traer facturas y pagos para calcular
+    return _supabase.from('invoices').stream(primaryKey: ['id']).asyncMap((
+      invoices,
+    ) async {
+      final invoicesWithPayments = await Future.wait(
+        invoices.map((inv) async {
+          final payments = await _supabase
+              .from('payments')
+              .select('amount')
+              .eq('invoice_id', inv['id']);
+          double totalPaid = 0;
+          for (var p in payments) {
+            totalPaid += (p['amount'] as num).toDouble();
+          }
+          return {...inv, 'total_paid': totalPaid};
+        }),
+      );
+      return invoicesWithPayments;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Deuda por Proveedor',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+      backgroundColor: Colors.grey[100],
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _getSummaryStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError)
+            return Center(child: Text('Error: ${snapshot.error}'));
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+
+          final data = snapshot.data!;
+
+          // Agrupar por proveedor
+          Map<String, Map<String, dynamic>> providerStats =
+              {}; // { 'Polar': { 'debtUSD': 100, 'count': 2 } }
+
+          for (var item in data) {
+            final inv = Invoice.fromMap(item);
+            final paid = (item['total_paid'] as num).toDouble();
+            final balance = inv.totalPayable - paid;
+
+            if (balance > 0.01) {
+              // Solo si hay deuda
+              if (!providerStats.containsKey(inv.provider)) {
+                providerStats[inv.provider] = {'debtUSD': 0.0, 'count': 0};
+              }
+
+              double debtInUsd = 0;
+              if (inv.currency == 'USD') {
+                debtInUsd = balance;
+              } else if (inv.currency == 'Bs' &&
+                  inv.exchangeRate != null &&
+                  inv.exchangeRate! > 0) {
+                debtInUsd = balance / inv.exchangeRate!;
+              }
+
+              providerStats[inv.provider]!['debtUSD'] += debtInUsd;
+              providerStats[inv.provider]!['count'] += 1;
+            }
+          }
+
+          if (providerStats.isEmpty) {
+            return const Center(
+              child: Text(
+                '¡Excelente! No tienes deudas pendientes.',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }
+
+          // Convertir a lista y ordenar por mayor deuda
+          List<MapEntry<String, Map<String, dynamic>>> sortedProviders =
+              providerStats.entries.toList()..sort(
+                (a, b) => b.value['debtUSD'].compareTo(a.value['debtUSD']),
+              );
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sortedProviders.length,
+            itemBuilder: (context, index) {
+              final entry = sortedProviders[index];
+              final name = entry.key;
+              final stats = entry.value;
+
+              return Card(
+                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(16),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue[100],
+                    child: Text(
+                      name.substring(0, 1).toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.blue[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${stats['count']} facturas pendientes',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Total Deuda',
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                      Text(
+                        '\$ ${stats['debtUSD'].toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    // NAVEGAR A LA VISTA FILTRADA DE ESTE PROVEEDOR
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          // Reutilizamos la misma pantalla de lista pero con un parámetro de filtro
+                          appBar: AppBar(
+                            title: Text(name),
+                          ), // AppBar simple para la subpantalla
+                          body: InvoiceListScreen(
+                            providerFilter: name,
+                          ), // Pasamos el filtro
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- LISTA DE FACTURAS (REUTILIZABLE Y FILTRABLE) ---
 class InvoiceListScreen extends StatefulWidget {
-  const InvoiceListScreen({super.key});
+  final String? providerFilter; // Parámetro opcional para filtrar
+  const InvoiceListScreen({super.key, this.providerFilter});
+
   @override
   State<InvoiceListScreen> createState() => _InvoiceListScreenState();
 }
@@ -286,32 +467,347 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   void _refreshStream() {
     setState(() {
-      _currentStream = _supabase
+      var query = _supabase
           .from('invoices')
           .stream(primaryKey: ['id'])
-          .order('invoice_date', ascending: false)
-          .asyncMap((invoices) async {
-            final invoicesWithPayments = await Future.wait(
-              invoices.map((inv) async {
-                final payments = await _supabase
-                    .from('payments')
-                    .select('amount')
-                    .eq('invoice_id', inv['id']);
+          .order('invoice_date', ascending: false);
 
-                double totalPaid = 0;
-                for (var p in payments) {
-                  totalPaid += (p['amount'] as num).toDouble();
-                }
-                return {...inv, 'total_paid': totalPaid};
-              }),
-            );
-            return invoicesWithPayments;
-          });
+      // La libreria stream de supabase no soporta .eq() directo en el stream builder facilmente para filtros dinamicos complejos
+      // Lo manejaremos filtrando la data en memoria (rápido para < 5000 registros)
+      // O si preferimos, podríamos usar .eq si el filtro no cambia, pero para simplificar la UI reactiva:
+
+      _currentStream = query.asyncMap((invoices) async {
+        final invoicesWithPayments = await Future.wait(
+          invoices.map((inv) async {
+            final payments = await _supabase
+                .from('payments')
+                .select('amount')
+                .eq('invoice_id', inv['id']);
+            double totalPaid = 0;
+            for (var p in payments) {
+              totalPaid += (p['amount'] as num).toDouble();
+            }
+            return {...inv, 'total_paid': totalPaid};
+          }),
+        );
+        return invoicesWithPayments;
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Si hay filtro de proveedor, no mostramos el Scaffold completo con AppBar de búsqueda
+    // porque ya estamos dentro de otra pantalla que tiene AppBar.
+    // Usaremos un widget contenedor.
+
+    // Si ES la pantalla principal (sin filtro), usamos Scaffold completo.
+    // Si TIENE filtro, devolvemos solo el contenido del body.
+
+    Widget content = StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _currentStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError)
+          return Center(child: Text('Error: ${snapshot.error}'));
+        if (!snapshot.hasData)
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          );
+
+        final data = snapshot.data!;
+
+        // FILTRADO LOCAL
+        final filteredData = data.where((inv) {
+          final provider = inv['provider'].toString();
+          // 1. Filtro estricto de proveedor (si venimos de la pantalla de resumen)
+          if (widget.providerFilter != null &&
+              provider != widget.providerFilter) {
+            return false;
+          }
+          // 2. Filtro de búsqueda (si estamos en la pantalla principal)
+          if (widget.providerFilter == null) {
+            final search = _searchQuery.toLowerCase();
+            final doc = inv['doc_number']?.toString().toLowerCase() ?? '';
+            return provider.toLowerCase().contains(search) ||
+                doc.contains(search);
+          }
+          return true;
+        }).toList();
+
+        // Cálculo de totales (Solo se muestran si NO estamos filtrando, o si queremos ver el total de ese proveedor)
+        double totalDebtUsd = 0;
+        for (var item in filteredData) {
+          final inv = Invoice.fromMap(item);
+          final paid = (item['total_paid'] as num).toDouble();
+          final balance = inv.totalPayable - paid;
+          if (balance > 0.01) {
+            if (inv.currency == 'USD') {
+              totalDebtUsd += balance;
+            } else if (inv.currency == 'Bs' &&
+                inv.exchangeRate != null &&
+                inv.exchangeRate! > 0) {
+              totalDebtUsd += balance / inv.exchangeRate!;
+            }
+          }
+        }
+
+        if (filteredData.isEmpty) {
+          return const Center(
+            child: Text(
+              'No hay registros encontrados',
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
+
+        return ListView(
+          padding: EdgeInsets.only(
+            bottom: widget.providerFilter == null ? 80 : 20,
+          ), // Espacio para FAB solo si no hay filtro
+          children: [
+            // TARJETA DE RESUMEN (Visible siempre, muestra el total de lo que se ve en pantalla)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: widget.providerFilter != null
+                        ? [
+                            Colors.orange.shade800,
+                            Colors.deepOrange,
+                          ] // Naranja para modo proveedor
+                        : [
+                            const Color(0xFF1565C0),
+                            const Color(0xFF1E88E5),
+                          ], // Azul para modo general
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.providerFilter != null
+                              ? 'Deuda Total con ${widget.providerFilter}'
+                              : 'Deuda Total Estimada',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$ ${totalDebtUsd.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        widget.providerFilter != null
+                            ? Icons.person
+                            : Icons.attach_money,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // LISTA DE FACTURAS
+            ...filteredData.map((item) {
+              final invoice = Invoice.fromMap(item);
+              final totalPaid = (item['total_paid'] as num).toDouble();
+              final balance = invoice.totalPayable - totalPaid;
+              final isPaid = balance <= 0.01;
+
+              return Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: InkWell(
+                  onTap: () => _showDetail(context, invoice),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    invoice.provider,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (invoice.docNumber != null &&
+                                      invoice.docNumber!.isNotEmpty)
+                                    Text(
+                                      '#${invoice.docNumber}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  Text(
+                                    DateFormat(
+                                      'dd MMM yyyy',
+                                    ).format(invoice.date),
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isPaid)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'PAGADA',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'PENDIENTE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Saldo Pendiente:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            Text(
+                              '${invoice.currency} ${balance.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: isPaid ? Colors.green : Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!isPaid) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _showInvoiceForm(
+                                    context,
+                                    invoice: invoice,
+                                  ),
+                                  child: const Text('Editar'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _showPaymentModal(
+                                    context,
+                                    invoice: invoice,
+                                    maxAmount: balance,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.attach_money,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Abonar'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+
+    // ESTRUCTURA FINAL: Si es modo filtro, solo devolvemos el contenido. Si es modo principal, devolvemos Scaffold.
+    if (widget.providerFilter != null) {
+      return Container(color: Colors.grey[100], child: content);
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: CustomScrollView(
@@ -343,290 +839,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               ),
             ),
           ),
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _currentStream,
-            builder: (context, snapshot) {
-              if (snapshot.hasError)
-                return SliverToBoxAdapter(
-                  child: Center(child: Text('Error: ${snapshot.error}')),
-                );
-              if (!snapshot.hasData)
-                return const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-                );
-
-              final data = snapshot.data!;
-              final filteredData = data.where((inv) {
-                final provider = inv['provider'].toString().toLowerCase();
-                final doc = inv['doc_number']?.toString().toLowerCase() ?? '';
-                return provider.contains(_searchQuery) ||
-                    doc.contains(_searchQuery);
-              }).toList();
-
-              double totalDebtUsd = 0;
-              for (var item in filteredData) {
-                final inv = Invoice.fromMap(item);
-                final paid = (item['total_paid'] as num).toDouble();
-                final balance = inv.totalPayable - paid;
-
-                if (balance > 0.01) {
-                  if (inv.currency == 'USD') {
-                    totalDebtUsd += balance;
-                  } else if (inv.currency == 'Bs' &&
-                      inv.exchangeRate != null &&
-                      inv.exchangeRate! > 0) {
-                    totalDebtUsd += balance / inv.exchangeRate!;
-                  }
-                }
-              }
-
-              if (filteredData.isEmpty) {
-                return const SliverFillRemaining(
-                  child: Center(
-                    child: Text(
-                      'No hay cuentas registradas',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                );
-              }
-
-              return SliverList(
-                delegate: SliverChildListDelegate([
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Deuda Total Estimada',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '\$ ${totalDebtUsd.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 28,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(
-                              Icons.attach_money,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  ...filteredData.map((item) {
-                    final invoice = Invoice.fromMap(item);
-                    final totalPaid = (item['total_paid'] as num).toDouble();
-                    final balance = invoice.totalPayable - totalPaid;
-                    final isPaid = balance <= 0.01;
-
-                    return Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
-                      child: InkWell(
-                        onTap: () => _showDetail(context, invoice),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          invoice.provider,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (invoice.docNumber != null &&
-                                            invoice.docNumber!.isNotEmpty)
-                                          Text(
-                                            '#${invoice.docNumber}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        Text(
-                                          DateFormat(
-                                            'dd MMM yyyy',
-                                          ).format(invoice.date),
-                                          style: const TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (isPaid)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green[50],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text(
-                                        'PAGADA',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red[50],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text(
-                                        'PENDIENTE',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const Divider(height: 20),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Saldo Pendiente:',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${invoice.currency} ${balance.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
-                                      color: isPaid ? Colors.green : Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (!isPaid) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => _showInvoiceForm(
-                                          context,
-                                          invoice: invoice,
-                                        ),
-                                        child: const Text('Editar'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: () => _showPaymentModal(
-                                          context,
-                                          invoice: invoice,
-                                          maxAmount: balance,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.attach_money,
-                                          size: 16,
-                                        ),
-                                        label: const Text('Abonar'),
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  const SizedBox(height: 80),
-                ]),
-              );
-            },
-          ),
+          SliverFillRemaining(child: content),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -694,8 +907,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
   final _docCtrl = TextEditingController();
   final _baseCtrl = TextEditingController();
   final _ivaCtrl = TextEditingController();
-  final _liquorTaxCtrl =
-      TextEditingController(); // NUEVO: Controlador para Impuesto Licor
+  final _liquorTaxCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
   final TextEditingController _providerTypeAheadCtrl = TextEditingController();
@@ -721,9 +933,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
 
       _baseCtrl.text = inv.baseAmount.toString();
       _ivaCtrl.text = inv.manualIva.toString();
-      _liquorTaxCtrl.text = inv.liquorTax > 0
-          ? inv.liquorTax.toString()
-          : ''; // Llenar si existe
+      _liquorTaxCtrl.text = inv.liquorTax > 0 ? inv.liquorTax.toString() : '';
       _notesCtrl.text = inv.notes ?? '';
       _rateCtrl.text = inv.exchangeRate?.toString() ?? '';
       _selectedDate = inv.date;
@@ -779,8 +989,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
       final finalManualIva = (isNota || !finalHasIva)
           ? 0.0
           : double.parse(_ivaCtrl.text.isEmpty ? '0' : _ivaCtrl.text);
-      final finalLiquorTax =
-          double.tryParse(_liquorTaxCtrl.text) ?? 0.0; // Obtener Impuesto Licor
+      final finalLiquorTax = double.tryParse(_liquorTaxCtrl.text) ?? 0.0;
 
       final data = {
         'doc_number': _docCtrl.text,
@@ -794,7 +1003,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
         'base_amount': double.parse(_baseCtrl.text),
         'has_iva': finalHasIva,
         'manual_iva': finalManualIva,
-        'liquor_tax': finalLiquorTax, // Guardar
+        'liquor_tax': finalLiquorTax,
         'retention_applies': finalRetention,
         'notes': _notesCtrl.text,
       };
@@ -989,7 +1198,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
               ),
               decoration: InputDecoration(
                 labelText: 'Impuesto al Licor (Opcional)',
-                prefixIcon: const Icon(Icons.liquor), // Un icono apropiado
+                prefixIcon: const Icon(Icons.liquor),
                 prefixText: _currency == 'USD' ? '\$ ' : 'Bs ',
                 helperText: 'Impuesto adicional fuera de la base imponible',
               ),
@@ -1484,7 +1693,6 @@ class InvoiceDetailDialog extends StatelessWidget {
         .eq('invoice_id', invoice.id)
         .order('payment_date', ascending: false);
 
-    // Si es Nota, el total es el monto base (sin IVA, sin retencion)
     final double totalFacial = invoice.type == 'Nota'
         ? invoice.baseAmount
         : invoice.baseAmount + invoice.manualIva + invoice.liquorTax;
@@ -1503,7 +1711,6 @@ class InvoiceDetailDialog extends StatelessWidget {
               );
 
             final payments = snapshot.data!;
-            // CÁLCULO EN VIVO DEL SALDO
             double totalPaid = 0;
             for (var p in payments) {
               totalPaid += (p['amount'] as num).toDouble();
@@ -1551,7 +1758,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                   ),
                   const Divider(),
 
-                  // RESUMEN FINANCIERO DINÁMICO
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -1573,7 +1779,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                             invoice.currency,
                           ),
 
-                        // MOSTRAR IMPUESTO LICOR SI EXISTE
                         if (invoice.liquorTax > 0)
                           _row(
                             'Impuesto Licor (+)',
@@ -1633,7 +1838,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                     ),
                   ),
 
-                  // CAJA DE SALDO PENDIENTE
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -1671,7 +1875,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
 
-                  // LISTA DE PAGOS CON EDICIÓN Y ELIMINACIÓN
                   Expanded(
                     child: payments.isEmpty
                         ? const Center(
@@ -1713,7 +1916,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    // BOTÓN ELIMINAR PAGO
                                     IconButton(
                                       icon: const Icon(
                                         Icons.delete_outline,
@@ -1747,7 +1949,6 @@ class InvoiceDetailDialog extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                // AL TOCAR: EDITAR PAGO
                                 onTap: () {
                                   showModalBottomSheet(
                                     context: context,
@@ -1760,9 +1961,8 @@ class InvoiceDetailDialog extends StatelessWidget {
                                       ),
                                       child: PaymentDialog(
                                         invoice: invoice,
-                                        maxAmount: 0, // No relevante en edición
-                                        existingPayment:
-                                            p, // Pasamos el pago completo para editar
+                                        maxAmount: 0,
+                                        existingPayment: p,
                                       ),
                                     ),
                                   );
