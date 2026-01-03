@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('INGRESAR'),
+                  child: const Text('INGRESAR AL SISTEMA'),
                 ),
               ],
             ),
