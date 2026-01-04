@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gestión Administrativa',
+      title: 'CUENTAS POR PAGAR',
       debugShowCheckedModeBanner: false,
       // --- IDIOMA ESPAÑOL ---
       localizationsDelegates: const [
@@ -244,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Icon(Icons.security, size: 64, color: AppColors.primary),
                 const SizedBox(height: 24),
                 const Text(
-                  'Gestión Administrativa',
+                  'CUENTAS POR PAGAR',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
@@ -1122,14 +1122,6 @@ class DashboardView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
-                'Mayores Acreedores',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDark,
-                ),
-              ),
               const SizedBox(height: 16),
               Card(
                 color: Colors.white,
