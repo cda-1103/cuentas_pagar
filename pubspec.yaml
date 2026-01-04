@@ -12,7 +12,7 @@ dependencies:
   supabase_flutter: ^2.1.0
   intl: ^0.20.1
   lucide_flutter: ^0.562.0
-
+  flutter_localization: ^0.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

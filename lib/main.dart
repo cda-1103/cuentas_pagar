@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// IMPORTANTE: Esta librería es necesaria para el calendario en español
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -38,8 +40,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cuentas por Pagar',
+      title: 'Gestión Administrativa',
       debugShowCheckedModeBanner: false,
+      // --- CONFIGURACIÓN DE IDIOMA PARA EL CALENDARIO ---
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'), // Español
+      ],
+      // --------------------------------------------------
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,
@@ -49,7 +61,6 @@ class MyApp extends StatelessWidget {
           background: AppColors.background,
           error: AppColors.error,
         ),
-        // Sin CardTheme global para evitar conflictos de tipo en tu versión de Flutter
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textDark,
@@ -229,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Icon(Icons.security, size: 64, color: AppColors.primary),
                 const SizedBox(height: 24),
                 const Text(
-                  'Cuentas por Pagar',
+                  'Gestión Administrativa',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
@@ -553,7 +564,6 @@ class _InvoiceFormState extends State<InvoiceForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _sectionHeader('DATOS GENERALES'),
-                        // TARJETA MANUAL PARA "CLEAN UI"
                         Card(
                           color: Colors.white,
                           surfaceTintColor: Colors.transparent,
@@ -1108,6 +1118,14 @@ class DashboardView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
+              const Text(
+                'Mayores Acreedores',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
               const SizedBox(height: 16),
               Card(
                 color: Colors.white,
@@ -1422,7 +1440,7 @@ class _InvoiceListViewState extends State<InvoiceListView> {
   }
 }
 
-// F. MODAL PAGO
+// F. MODAL PAGO (REPARADO Y CON FECHAS OK)
 class PaymentDialog extends StatefulWidget {
   final Invoice invoice;
   final double maxAmount;
@@ -1549,10 +1567,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
               Expanded(
                 child: InkWell(
                   onTap: () async {
+                    // FIX: lastDate 2030 para evitar crash
                     final d = await showDatePicker(
                       context: context,
                       firstDate: DateTime(2020),
-                      lastDate: DateTime.now(),
+                      lastDate: DateTime(2030),
                       initialDate: _date,
                       locale: const Locale('es'),
                     );
