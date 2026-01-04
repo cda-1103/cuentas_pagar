@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// IMPORTANTE: Esta librería es necesaria para el calendario en español
+// IMPORTANTE: Librería para el idioma del calendario
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -40,18 +40,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cuentas por Pagar',
+      title: 'CUENTAS POR PAGAR',
       debugShowCheckedModeBanner: false,
-      // --- CONFIGURACIÓN DE IDIOMA PARA EL CALENDARIO ---
+      // --- IDIOMA ESPAÑOL ---
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('es', 'ES'), // Español
-      ],
-      // --------------------------------------------------
+      supportedLocales: const [Locale('es', 'ES')],
+      // ----------------------
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,
@@ -172,10 +170,12 @@ class Invoice {
       ? 0.0
       : (retentionApplies ? manualIva * 0.75 : 0.0);
 
-  double get totalPayable {
-    double iva = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
-    return (baseAmount + iva + liquorTax) - retentionAmount;
-  }
+  // Total bruto antes de retenciones
+  double get subTotal =>
+      baseAmount + ((type == 'Nota' || !hasIva) ? 0.0 : manualIva) + liquorTax;
+
+  // Total líquido a pagar
+  double get totalPayable => subTotal - retentionAmount;
 
   factory Invoice.fromMap(Map<String, dynamic> map) {
     return Invoice(
@@ -1197,7 +1197,7 @@ class DashboardView extends StatelessWidget {
   }
 }
 
-// E. LISTADO DE CUENTAS (CON VISUALIZACIÓN DE NOTAS)
+// E. LISTADO DE CUENTAS
 class InvoiceListView extends StatefulWidget {
   final String? providerFilter;
   const InvoiceListView({super.key, this.providerFilter});
@@ -1344,7 +1344,6 @@ class _InvoiceListViewState extends State<InvoiceListView> {
                             ),
                           ],
                         ),
-                        // --- VISUALIZACIÓN DE NOTA ---
                         if (inv.notes != null && inv.notes!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -1371,7 +1370,6 @@ class _InvoiceListViewState extends State<InvoiceListView> {
                               ],
                             ),
                           ),
-                        // ----------------------------
                         if (!isPaid) ...[
                           const Divider(height: 24),
                           Row(
@@ -1432,7 +1430,7 @@ class _InvoiceListViewState extends State<InvoiceListView> {
   }
 }
 
-// F. MODAL PAGO (REPARADO Y CON FECHAS OK)
+// F. MODAL PAGO (REPARADO Y CON AUTO-RELLENADO)
 class PaymentDialog extends StatefulWidget {
   final Invoice invoice;
   final double maxAmount;
@@ -1459,11 +1457,14 @@ class _PaymentDialogState extends State<PaymentDialog> {
   void initState() {
     super.initState();
     _loadMethods();
+    // AUTO-RELLENAR: Si no es edición, ponemos el monto total pendiente
     if (widget.existing != null) {
       _amt.text = widget.existing!['amount'].toString();
       _note.text = widget.existing!['note'] ?? '';
       _method = widget.existing!['method'];
       _date = DateTime.parse(widget.existing!['payment_date']);
+    } else {
+      _amt.text = widget.maxAmount.toStringAsFixed(2);
     }
   }
 
@@ -1559,7 +1560,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
               Expanded(
                 child: InkWell(
                   onTap: () async {
-                    // FIX: lastDate 2030 para evitar crash
                     final d = await showDatePicker(
                       context: context,
                       firstDate: DateTime(2020),
@@ -1734,7 +1734,7 @@ class _ProvidersListViewState extends State<ProvidersListView> {
   }
 }
 
-// H. ABONOS GENERALES (CON VISUALIZACIÓN DE NOTAS)
+// H. ABONOS GENERALES
 class PaymentsView extends StatefulWidget {
   const PaymentsView({super.key});
   @override
@@ -1823,7 +1823,6 @@ class _PaymentsViewState extends State<PaymentsView> {
                     inv.provider,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  // SUBTITULO MEJORADO CON NOTA
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2035,7 +2034,7 @@ class _GenericConfigListState extends State<GenericConfigList> {
   }
 }
 
-// J. DETALLE FACTURA (CON CÁLCULO DE RESTANTE POR PAGAR)
+// J. DETALLE FACTURA (CON ELIMINAR Y SUB-TOTALES)
 class InvoiceDetailDialog extends StatelessWidget {
   final Invoice invoice;
   const InvoiceDetailDialog({super.key, required this.invoice});
@@ -2049,7 +2048,7 @@ class InvoiceDetailDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 800),
         child: Column(
           children: [
-            // Cabecera Azul
+            // Cabecera Azul (AHORA CON BOTÓN DE ELIMINAR)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
@@ -2075,6 +2074,47 @@ class InvoiceDetailDialog extends StatelessWidget {
                           style: const TextStyle(color: Colors.white70),
                         ),
                       ],
+                    ),
+                  ),
+                  // Botón Eliminar
+                  IconButton(
+                    onPressed: () async {
+                      final confirm = await showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('¿Eliminar Factura?'),
+                          content: const Text(
+                            'Esta acción borrará la factura y todo su historial de pagos. No se puede deshacer.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await Supabase.instance.client
+                            .from('invoices')
+                            .delete()
+                            .eq('id', invoice.id);
+                        if (context.mounted)
+                          Navigator.pop(
+                            context,
+                          ); // Cierra el diálogo de detalle
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.white70,
                     ),
                   ),
                   IconButton(
@@ -2107,7 +2147,7 @@ class InvoiceDetailDialog extends StatelessWidget {
                   return ListView(
                     padding: const EdgeInsets.all(24),
                     children: [
-                      // --- RESUMEN FINANCIERO MEJORADO ---
+                      // --- RESUMEN FINANCIERO MEJORADO (CON SUBTOTAL) ---
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -2121,8 +2161,15 @@ class InvoiceDetailDialog extends StatelessWidget {
                               _r('Imp. Licor', invoice.liquorTax),
                             if (invoice.hasIva)
                               _r('IVA (16%)', invoice.manualIva),
+
+                            // SI HAY RETENCIÓN, MOSTRAMOS EL SUBTOTAL PRIMERO
                             if (invoice.retentionAmount > 0) ...[
                               const Divider(),
+                              _r(
+                                'Subtotal',
+                                invoice.subTotal,
+                                bold: true,
+                              ), // Suma antes de retención
                               _r(
                                 'Retención (-)',
                                 -invoice.retentionAmount,
@@ -2131,7 +2178,7 @@ class InvoiceDetailDialog extends StatelessWidget {
                             ],
                             const Divider(),
                             _r(
-                              'TOTAL FACTURA',
+                              'TOTAL A PAGAR',
                               invoice.totalPayable,
                               bold: true,
                               size: 16,
@@ -2328,25 +2375,46 @@ class InvoiceDetailDialog extends StatelessWidget {
               ),
             ),
 
-            // Botón de acción
+            // Botón de acción (CORREGIDO: AHORA PASA EL BALANCE REAL)
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (ctx) => Padding(
-                      padding: EdgeInsets.only(
-                        bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                      ),
-                      child: PaymentDialog(invoice: invoice, maxAmount: 0),
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                // Necesitamos recalcular el saldo para enviarlo al botón
+                stream: Supabase.instance.client
+                    .from('payments')
+                    .stream(primaryKey: ['id'])
+                    .eq('invoice_id', invoice.id),
+                builder: (context, snapshot) {
+                  double paid = 0;
+                  if (snapshot.hasData) {
+                    for (var p in snapshot.data!)
+                      paid += (p['amount'] as num).toDouble();
+                  }
+                  final currentBalance = invoice.totalPayable - paid;
+
+                  return SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: currentBalance <= 0.01
+                          ? null
+                          : () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (ctx) => Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                ),
+                                child: PaymentDialog(
+                                  invoice: invoice,
+                                  maxAmount: currentBalance,
+                                ), // AQUI SE PASABA 0 ANTES
+                              ),
+                            ),
+                      icon: const Icon(Icons.add_card),
+                      label: const Text('REGISTRAR ABONO'),
                     ),
-                  ),
-                  icon: const Icon(Icons.add_card),
-                  label: const Text('REGISTRAR ABONO'),
-                ),
+                  );
+                },
               ),
             ),
           ],
