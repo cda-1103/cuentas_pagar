@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-// --- CONFIGURACIÓN INICIAL ---
+// --- 1. CONFIGURACIÓN INICIAL ---
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es');
 
-  // REEMPLAZA ESTO CON TUS CREDENCIALES DE SUPABASE
+  // TODO: REEMPLAZA CON TUS CREDENCIALES REALES
   await Supabase.initialize(
     url: 'https://imzvxzpdtvllzfpmkilm.supabase.co',
     anonKey: 'sb_publishable_xefs9EwRoQrSjk6aBpgDoA_zZNruwhP',
@@ -16,22 +18,18 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-// --- HERRAMIENTA PARA COMAS Y PUNTOS ---
-class DecimalInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    String newText = newValue.text.replaceAll(',', '.');
-    if ('.'.allMatches(newText).length > 1) {
-      return oldValue;
-    }
-    return newValue.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
+// --- 2. TEMA Y ESTILOS ---
+class AppColors {
+  static const primary = Color(0xFF0052CC); // Azul Institucional
+  static const primaryDark = Color(0xFF0747A6);
+  static const background = Color(0xFFF4F5F7); // Gris Muy Claro
+  static const surface = Colors.white;
+  static const textDark = Color(0xFF172B4D);
+  static const textGrey = Color(0xFF6B778C);
+  static const border = Color(0xFFDFE1E6);
+  static const success = Color(0xFF00875A);
+  static const error = Color(0xFFDE350B);
+  static const warning = Color(0xFFFF991F);
 }
 
 class MyApp extends StatelessWidget {
@@ -40,21 +38,69 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Control de Cuentas por Pagar',
+      title: 'Cuentas por Pagar',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E88E5), // Azul Corporativo
-          brightness: Brightness.light,
-        ),
         useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.background,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          surface: AppColors.surface,
+          background: AppColors.background,
+          error: AppColors.error,
+        ),
+        // Sin CardTheme global para evitar conflictos de tipo en tu versión de Flutter
+        appBarTheme: const AppBarTheme(
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textDark,
+          elevation: 0,
+          centerTitle: true,
+          scrolledUnderElevation: 0,
+          titleTextStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textDark,
+          ),
+          iconTheme: IconThemeData(color: AppColors.textDark),
+        ),
         inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
-          fillColor: Colors.grey[50],
+          fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 14,
+            vertical: 16,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
+          labelStyle: const TextStyle(color: AppColors.textGrey),
+          floatingLabelStyle: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
         ),
       ),
@@ -63,96 +109,23 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- PANTALLA DE LOGIN ---
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
-
+// --- 3. UTILIDADES ---
+class DecimalInputFormatter extends TextInputFormatter {
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  final _passCtrl = TextEditingController();
-  bool _isObscure = true;
-
-  void _login() {
-    if (_passCtrl.text.trim() == 'BBT-2025') {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Contraseña incorrecta'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1),
-      body: Center(
-        child: Card(
-          margin: const EdgeInsets.all(24),
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.lock_outline,
-                  size: 64,
-                  color: Color(0xFF1E88E5),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Control de Cuentas por Pagar',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _passCtrl,
-                  obscureText: _isObscure,
-                  decoration: InputDecoration(
-                    labelText: 'Contraseña de Acceso',
-                    prefixIcon: const Icon(Icons.vpn_key),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isObscure ? Icons.visibility : Icons.visibility_off,
-                      ),
-                      onPressed: () => setState(() => _isObscure = !_isObscure),
-                    ),
-                  ),
-                  onSubmitted: (_) => _login(),
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _login,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('INGRESAR AL SISTEMA'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String newText = newValue.text.replaceAll(',', '.');
+    if ('.'.allMatches(newText).length > 1) return oldValue;
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
     );
   }
 }
 
-// --- MODELOS DE DATOS ---
+// --- 4. MODELOS ---
 class Invoice {
   final int id;
   final String? docNumber;
@@ -184,30 +157,27 @@ class Invoice {
     this.notes,
   });
 
-  double get retentionAmount {
-    if (type == 'Nota') return 0.0;
-    if (!hasIva) return 0.0;
-    return retentionApplies ? manualIva * 0.75 : 0.0;
-  }
+  double get retentionAmount => (type == 'Nota' || !hasIva)
+      ? 0.0
+      : (retentionApplies ? manualIva * 0.75 : 0.0);
 
   double get totalPayable {
-    double ivaToSum = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
-    double totalFacial = baseAmount + ivaToSum + liquorTax;
-    return totalFacial - retentionAmount;
+    double iva = (type == 'Nota' || !hasIva) ? 0.0 : manualIva;
+    return (baseAmount + iva + liquorTax) - retentionAmount;
   }
 
   factory Invoice.fromMap(Map<String, dynamic> map) {
     return Invoice(
       id: map['id'],
       docNumber: map['doc_number'],
-      provider: map['provider'],
-      date: DateTime.parse(map['invoice_date']),
-      type: map['type'],
-      currency: map['currency'],
+      provider: map['provider'] ?? 'Desconocido',
+      date: DateTime.tryParse(map['invoice_date'] ?? '') ?? DateTime.now(),
+      type: map['type'] ?? 'Factura',
+      currency: map['currency'] ?? 'USD',
       exchangeRate: map['exchange_rate'] != null
           ? (map['exchange_rate'] as num).toDouble()
           : null,
-      baseAmount: (map['base_amount'] as num).toDouble(),
+      baseAmount: (map['base_amount'] as num?)?.toDouble() ?? 0.0,
       hasIva: map['has_iva'] ?? false,
       manualIva: (map['manual_iva'] as num?)?.toDouble() ?? 0.0,
       liquorTax: (map['liquor_tax'] as num?)?.toDouble() ?? 0.0,
@@ -217,758 +187,198 @@ class Invoice {
   }
 }
 
-// --- PANTALLA PRINCIPAL ---
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+// --- 5. PANTALLAS ---
+
+// A. LOGIN
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+class _LoginScreenState extends State<LoginScreen> {
+  final _passCtrl = TextEditingController();
+  bool _isObscure = true;
 
-  static const List<Widget> _pages = <Widget>[
-    InvoiceListScreen(), // Índice 0: Todas las cuentas
-    ProviderSummaryScreen(), // Índice 1: Resumen por Proveedor
-    SettingsScreen(), // Índice 2: Configuración
+  void _login() {
+    if (_passCtrl.text.trim() == 'BBT-2025') {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainLayout()));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contraseña incorrecta'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              children: [
+                const Icon(Icons.security, size: 64, color: AppColors.primary),
+                const SizedBox(height: 24),
+                const Text(
+                  'Cuentas por Pagar',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                TextField(
+                  controller: _passCtrl,
+                  obscureText: _isObscure,
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña',
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isObscure
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () => setState(() => _isObscure = !_isObscure),
+                    ),
+                  ),
+                  onSubmitted: (_) => _login(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _login,
+                    child: const Text('ENTRAR'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// B. LAYOUT PRINCIPAL
+class MainLayout extends StatefulWidget {
+  const MainLayout({super.key});
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  int _index = 0;
+  final List<Widget> _views = [
+    const DashboardView(),
+    const InvoiceListView(),
+    const PaymentsView(),
+    const ProvidersListView(),
+    const SettingsView(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages.elementAt(_selectedIndex),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) =>
-            setState(() => _selectedIndex = index),
-        destinations: const <Widget>[
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Cuentas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups),
-            label: 'Proveedores',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Configuración',
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final isDesktop = MediaQuery.of(context).size.width > 900;
 
-// --- PANTALLA 2: RESUMEN POR PROVEEDOR ---
-class ProviderSummaryScreen extends StatefulWidget {
-  const ProviderSummaryScreen({super.key});
-
-  @override
-  State<ProviderSummaryScreen> createState() => _ProviderSummaryScreenState();
-}
-
-class _ProviderSummaryScreenState extends State<ProviderSummaryScreen> {
-  final _supabase = Supabase.instance.client;
-  String _providerSearchQuery = '';
-
-  Stream<List<Map<String, dynamic>>> _getSummaryStream() {
-    return _supabase.from('invoices').stream(primaryKey: ['id']).asyncMap((
-      invoices,
-    ) async {
-      final invoicesWithPayments = await Future.wait(
-        invoices.map((inv) async {
-          final payments = await _supabase
-              .from('payments')
-              .select('amount')
-              .eq('invoice_id', inv['id']);
-          double totalPaid = 0;
-          for (var p in payments) {
-            totalPaid += (p['amount'] as num).toDouble();
-          }
-          return {...inv, 'total_paid': totalPaid};
-        }),
-      );
-      return invoicesWithPayments;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Deuda por Proveedor',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Buscar proveedor...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (val) =>
-                  setState(() => _providerSearchQuery = val.toLowerCase()),
-            ),
-          ),
-        ),
-      ),
-      backgroundColor: Colors.grey[100],
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _getSummaryStream(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-
-          final data = snapshot.data!;
-
-          Map<String, Map<String, dynamic>> providerStats = {};
-
-          for (var item in data) {
-            final inv = Invoice.fromMap(item);
-            final paid = (item['total_paid'] as num).toDouble();
-            final balance = inv.totalPayable - paid;
-
-            if (balance > 0.01) {
-              if (!providerStats.containsKey(inv.provider)) {
-                providerStats[inv.provider] = {'debtUSD': 0.0, 'count': 0};
-              }
-
-              double debtInUsd = 0;
-              if (inv.currency == 'USD') {
-                debtInUsd = balance;
-              } else if (inv.currency == 'Bs' &&
-                  inv.exchangeRate != null &&
-                  inv.exchangeRate! > 0) {
-                debtInUsd = balance / inv.exchangeRate!;
-              }
-
-              providerStats[inv.provider]!['debtUSD'] += debtInUsd;
-              providerStats[inv.provider]!['count'] += 1;
-            }
-          }
-
-          List<MapEntry<String, Map<String, dynamic>>> filteredProviders =
-              providerStats.entries
-                  .where(
-                    (entry) =>
-                        entry.key.toLowerCase().contains(_providerSearchQuery),
-                  )
-                  .toList();
-
-          if (filteredProviders.isEmpty) {
-            return const Center(
-              child: Text(
-                'No hay deudas pendientes con ese criterio.',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            );
-          }
-
-          filteredProviders.sort(
-            (a, b) => b.value['debtUSD'].compareTo(a.value['debtUSD']),
-          );
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredProviders.length,
-            itemBuilder: (context, index) {
-              final entry = filteredProviders[index];
-              final name = entry.key;
-              final stats = entry.value;
-
-              return Card(
-                elevation: 3,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue[100],
-                    child: Text(
-                      name.substring(0, 1).toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.blue[800],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  title: Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${stats['count']} facturas pendientes',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'Total Deuda',
-                        style: TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
-                      Text(
-                        '\$ ${stats['debtUSD'].toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => Scaffold(
-                          appBar: AppBar(title: Text(name)),
-                          body: InvoiceListScreen(providerFilter: name),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// --- LISTA DE FACTURAS (REUTILIZABLE) ---
-class InvoiceListScreen extends StatefulWidget {
-  final String? providerFilter;
-  const InvoiceListScreen({super.key, this.providerFilter});
-
-  @override
-  State<InvoiceListScreen> createState() => _InvoiceListScreenState();
-}
-
-class _InvoiceListScreenState extends State<InvoiceListScreen> {
-  final _supabase = Supabase.instance.client;
-  String _searchQuery = '';
-  late Stream<List<Map<String, dynamic>>> _currentStream;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshStream();
-  }
-
-  void _refreshStream() {
-    setState(() {
-      var query = _supabase
-          .from('invoices')
-          .stream(primaryKey: ['id'])
-          .order('invoice_date', ascending: false);
-
-      _currentStream = query.asyncMap((invoices) async {
-        final invoicesWithPayments = await Future.wait(
-          invoices.map((inv) async {
-            final payments = await _supabase
-                .from('payments')
-                .select('amount')
-                .eq('invoice_id', inv['id']);
-            double totalPaid = 0;
-            for (var p in payments) {
-              totalPaid += (p['amount'] as num).toDouble();
-            }
-            return {...inv, 'total_paid': totalPaid};
-          }),
-        );
-        return invoicesWithPayments;
-      });
-    });
-  }
-
-  // FUNCIÓN PARA ELIMINAR DESDE LA LISTA
-  Future<void> _deleteInvoiceFromList(int id) async {
-    final confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Borrar Factura?'),
-        content: const Text(
-          'Se eliminará la factura y todos sus abonos.\nEsta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await _supabase.from('invoices').delete().eq('id', id);
-      _refreshStream(); // Recargar lista
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget content = StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _currentStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError)
-          return Center(child: Text('Error: ${snapshot.error}'));
-        if (!snapshot.hasData)
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
-          );
-
-        final data = snapshot.data!;
-
-        final filteredData = data.where((inv) {
-          final provider = inv['provider'].toString();
-          if (widget.providerFilter != null &&
-              provider != widget.providerFilter) {
-            return false;
-          }
-          if (widget.providerFilter == null) {
-            final search = _searchQuery.toLowerCase();
-            final doc = inv['doc_number']?.toString().toLowerCase() ?? '';
-            return provider.toLowerCase().contains(search) ||
-                doc.contains(search);
-          }
-          return true;
-        }).toList();
-
-        double totalDebtUsd = 0;
-        for (var item in filteredData) {
-          final inv = Invoice.fromMap(item);
-          final paid = (item['total_paid'] as num).toDouble();
-          final balance = inv.totalPayable - paid;
-          if (balance > 0.01) {
-            if (inv.currency == 'USD') {
-              totalDebtUsd += balance;
-            } else if (inv.currency == 'Bs' &&
-                inv.exchangeRate != null &&
-                inv.exchangeRate! > 0) {
-              totalDebtUsd += balance / inv.exchangeRate!;
-            }
-          }
-        }
-
-        if (filteredData.isEmpty) {
-          return const Center(
-            child: Text(
-              'No hay registros encontrados',
-              style: TextStyle(color: Colors.grey),
-            ),
-          );
-        }
-
-        return ListView(
-          padding: EdgeInsets.only(
-            bottom: widget.providerFilter == null ? 80 : 20,
-          ),
+    if (isDesktop) {
+      return Scaffold(
+        body: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: widget.providerFilter != null
-                        ? [Colors.orange.shade800, Colors.deepOrange]
-                        : [const Color(0xFF1565C0), const Color(0xFF1E88E5)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.providerFilter != null
-                              ? 'Deuda Total con ${widget.providerFilter}'
-                              : 'Deuda Total Estimada',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '\$ ${totalDebtUsd.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 28,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        widget.providerFilter != null
-                            ? Icons.person
-                            : Icons.attach_money,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                  ],
+            NavigationRail(
+              selectedIndex: _index,
+              onDestinationSelected: (i) => setState(() => _index = i),
+              labelType: NavigationRailLabelType.all,
+              backgroundColor: Colors.white,
+              groupAlignment: -0.9,
+              leading: const Padding(
+                padding: EdgeInsets.only(bottom: 24),
+                child: Icon(
+                  Icons.grid_view_rounded,
+                  size: 32,
+                  color: AppColors.primary,
                 ),
               ),
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.bar_chart_rounded),
+                  label: Text('Resumen'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.receipt_long_rounded),
+                  label: Text('Cuentas'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.payments_outlined),
+                  label: Text('Abonos'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_alt_rounded),
+                  label: Text('Prov.'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.settings_rounded),
+                  label: Text('Config'),
+                ),
+              ],
             ),
-
-            ...filteredData.map((item) {
-              final invoice = Invoice.fromMap(item);
-              final totalPaid = (item['total_paid'] as num).toDouble();
-              final balance = invoice.totalPayable - totalPaid;
-              final isPaid = balance <= 0.01;
-
-              return Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: InkWell(
-                  onTap: () => _showDetail(context, invoice),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // CABECERA CON BOTÓN DE BORRAR
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    invoice.provider,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (invoice.docNumber != null &&
-                                      invoice.docNumber!.isNotEmpty)
-                                    Text(
-                                      '#${invoice.docNumber}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 14,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  Text(
-                                    DateFormat(
-                                      'dd MMM yyyy',
-                                    ).format(invoice.date),
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-
-                                  if (invoice.notes != null &&
-                                      invoice.notes!.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.note,
-                                            size: 14,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              invoice.notes!,
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontStyle: FontStyle.italic,
-                                                fontSize: 12,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-
-                            // COLUMNA DERECHA: PAPELERA Y ESTADO
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                // BOTÓN DE ELIMINAR RÁPIDO
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                    size: 24,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () =>
-                                      _deleteInvoiceFromList(invoice.id),
-                                ),
-                                const SizedBox(height: 8),
-                                if (isPaid)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'PAGADA',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'PENDIENTE',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Saldo Pendiente:',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '${invoice.currency} ${balance.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: isPaid ? Colors.green : Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (!isPaid) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _showInvoiceForm(
-                                    context,
-                                    invoice: invoice,
-                                  ),
-                                  child: const Text('Editar'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: () => _showPaymentModal(
-                                    context,
-                                    invoice: invoice,
-                                    maxAmount: balance,
-                                  ),
-                                  icon: const Icon(
-                                    Icons.attach_money,
-                                    size: 16,
-                                  ),
-                                  label: const Text('Abonar'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+            const VerticalDivider(width: 1, color: AppColors.border),
+            Expanded(child: _views[_index]),
           ],
-        );
-      },
-    );
-
-    if (widget.providerFilter != null) {
-      return Container(color: Colors.grey[100], child: content);
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            title: const Text(
-              'Cuentas por Pagar',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Buscar proveedor, número...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onChanged: (val) =>
-                      setState(() => _searchQuery = val.toLowerCase()),
-                ),
-              ),
-            ),
-          ),
-          SliverFillRemaining(child: content),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showInvoiceForm(context),
-        label: const Text('Nueva Cuenta'),
-        icon: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Future<void> _showInvoiceForm(
-    BuildContext context, {
-    Invoice? invoice,
-  }) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => InvoiceForm(existingInvoice: invoice),
-    );
-    _refreshStream();
-  }
-
-  Future<void> _showPaymentModal(
-    BuildContext context, {
-    required Invoice invoice,
-    required double maxAmount,
-  }) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: PaymentDialog(invoice: invoice, maxAmount: maxAmount),
-      ),
-    );
-    _refreshStream();
-  }
-
-  Future<void> _showDetail(BuildContext context, Invoice invoice) async {
-    await showDialog(
-      context: context,
-      builder: (context) => InvoiceDetailDialog(invoice: invoice),
-    );
-    _refreshStream();
+      );
+    } else {
+      return Scaffold(
+        body: _views[_index],
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          backgroundColor: Colors.white,
+          indicatorColor: AppColors.primary.withOpacity(0.1),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_rounded),
+              label: 'Resumen',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_rounded),
+              label: 'Cuentas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.payments_outlined),
+              label: 'Abonos',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_alt_rounded),
+              label: 'Prov.',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_rounded),
+              label: 'Config',
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
 
-// --- FORMULARIO DE FACTURA ---
+// C. FORMULARIO FACTURA
 class InvoiceForm extends StatefulWidget {
-  final Invoice? existingInvoice;
-  const InvoiceForm({super.key, this.existingInvoice});
+  final Invoice? existing;
+  const InvoiceForm({super.key, this.existing});
   @override
   State<InvoiceForm> createState() => _InvoiceFormState();
 }
@@ -978,112 +388,130 @@ class _InvoiceFormState extends State<InvoiceForm> {
   final _docCtrl = TextEditingController();
   final _baseCtrl = TextEditingController();
   final _ivaCtrl = TextEditingController();
-  final _liquorTaxCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
+  final _taxCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController();
   final _rateCtrl = TextEditingController();
-  final TextEditingController _providerTypeAheadCtrl = TextEditingController();
+  final _provCtrl = TextEditingController();
 
-  DateTime _selectedDate = DateTime.now();
+  DateTime _date = DateTime.now();
   String _type = 'Factura';
   String _currency = 'USD';
-  String? _selectedProvider;
-  List<String> _providersList = [];
-  bool _hasIva = true;
-  bool _retentionApplies = true;
+  String? _selectedProv;
+  List<String> _provs = [];
+  bool _iva = true;
+  bool _ret = false;
   bool _loading = false;
+  bool _manualIvaEdit = false;
+
+  double _prevTotal = 0;
+  double _prevRetAmount = 0;
 
   @override
   void initState() {
     super.initState();
-    _fetchProviders();
-    if (widget.existingInvoice != null) {
-      final inv = widget.existingInvoice!;
-      _docCtrl.text = inv.docNumber ?? '';
-      _selectedProvider = inv.provider;
-      _providerTypeAheadCtrl.text = inv.provider;
-
-      _baseCtrl.text = inv.baseAmount.toString();
-      _ivaCtrl.text = inv.manualIva.toString();
-      _liquorTaxCtrl.text = inv.liquorTax > 0 ? inv.liquorTax.toString() : '';
-      _notesCtrl.text = inv.notes ?? '';
-      _rateCtrl.text = inv.exchangeRate?.toString() ?? '';
-      _selectedDate = inv.date;
-      _type = inv.type;
-      _currency = inv.currency;
-      _hasIva = inv.hasIva;
-      _retentionApplies = inv.retentionApplies;
+    _loadProvs();
+    if (widget.existing != null) {
+      final i = widget.existing!;
+      _docCtrl.text = i.docNumber ?? '';
+      _provCtrl.text = i.provider;
+      _selectedProv = i.provider;
+      _baseCtrl.text = i.baseAmount.toString();
+      _ivaCtrl.text = i.manualIva.toString();
+      _taxCtrl.text = i.liquorTax > 0 ? i.liquorTax.toString() : '';
+      _noteCtrl.text = i.notes ?? '';
+      _rateCtrl.text = i.exchangeRate?.toString() ?? '';
+      _date = i.date;
+      _type = i.type;
+      _currency = i.currency;
+      _iva = i.hasIva;
+      _ret = i.retentionApplies;
+      _manualIvaEdit = true;
     }
+    _baseCtrl.addListener(_onBaseAmountChanged);
+    _updatePreview();
   }
 
-  Future<void> _fetchProviders() async {
+  @override
+  void dispose() {
+    _baseCtrl.removeListener(_onBaseAmountChanged);
+    super.dispose();
+  }
+
+  void _onBaseAmountChanged() {
+    if (_type == 'Factura' && _iva && !_manualIvaEdit) {
+      double base = double.tryParse(_baseCtrl.text.replaceAll(',', '.')) ?? 0;
+      double autoIva = base * 0.16;
+      _ivaCtrl.text = autoIva == 0 ? '' : autoIva.toStringAsFixed(2);
+    }
+    _updatePreview();
+  }
+
+  Future<void> _loadProvs() async {
     final res = await Supabase.instance.client
         .from('providers')
         .select()
         .order('name');
-    if (mounted) {
-      setState(() {
-        _providersList = (res as List).map((e) => e['name'] as String).toList();
-      });
-    }
+    if (mounted)
+      setState(
+        () => _provs = (res as List).map((e) => e['name'] as String).toList(),
+      );
   }
 
-  void _calculateIva() {
-    if (_type == 'Factura' && _hasIva && _baseCtrl.text.isNotEmpty) {
-      final base = double.tryParse(_baseCtrl.text) ?? 0;
-      setState(() {
-        _ivaCtrl.text = (base * 0.16).toStringAsFixed(2);
-      });
-    } else {
-      if (_ivaCtrl.text.isNotEmpty && (!_hasIva || _type == 'Nota')) {
-        _ivaCtrl.text = '0.00';
-      }
+  void _updatePreview() {
+    double base = double.tryParse(_baseCtrl.text.replaceAll(',', '.')) ?? 0;
+    double tax = double.tryParse(_taxCtrl.text.replaceAll(',', '.')) ?? 0;
+    double ivaCalc = 0;
+    double retCalc = 0;
+
+    if (_type == 'Factura' && _iva) {
+      ivaCalc = double.tryParse(_ivaCtrl.text.replaceAll(',', '.')) ?? 0;
+      if (_ret) retCalc = ivaCalc * 0.75;
     }
+
+    setState(() {
+      _prevRetAmount = retCalc;
+      _prevTotal = (base + ivaCalc + tax) - retCalc;
+    });
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final providerToSave = _selectedProvider ?? _providerTypeAheadCtrl.text;
-    if (providerToSave.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor ingresa un proveedor')),
-      );
+    final prov = _selectedProv ?? _provCtrl.text;
+    if (prov.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Falta Proveedor')));
       return;
     }
-
     setState(() => _loading = true);
 
     try {
       final isNota = _type == 'Nota';
-      final finalHasIva = isNota ? false : _hasIva;
-      final finalRetention = isNota ? false : _retentionApplies;
-      final finalManualIva = (isNota || !finalHasIva)
-          ? 0.0
-          : double.parse(_ivaCtrl.text.isEmpty ? '0' : _ivaCtrl.text);
-      final finalLiquorTax = double.tryParse(_liquorTaxCtrl.text) ?? 0.0;
-
       final data = {
         'doc_number': _docCtrl.text,
-        'provider': providerToSave,
-        'invoice_date': _selectedDate.toIso8601String(),
+        'provider': prov,
+        'invoice_date': _date.toIso8601String(),
         'type': _type,
         'currency': _currency,
         'exchange_rate': _currency == 'Bs' && _rateCtrl.text.isNotEmpty
-            ? double.parse(_rateCtrl.text)
+            ? double.parse(_rateCtrl.text.replaceAll(',', '.'))
             : null,
-        'base_amount': double.parse(_baseCtrl.text),
-        'has_iva': finalHasIva,
-        'manual_iva': finalManualIva,
-        'liquor_tax': finalLiquorTax,
-        'retention_applies': finalRetention,
-        'notes': _notesCtrl.text,
+        'base_amount':
+            double.tryParse(_baseCtrl.text.replaceAll(',', '.')) ?? 0,
+        'has_iva': isNota ? false : _iva,
+        'manual_iva': (isNota || !_iva)
+            ? 0
+            : double.tryParse(_ivaCtrl.text.replaceAll(',', '.')) ?? 0,
+        'liquor_tax': double.tryParse(_taxCtrl.text.replaceAll(',', '.')) ?? 0,
+        'retention_applies': isNota ? false : _ret,
+        'notes': _noteCtrl.text,
       };
 
-      if (widget.existingInvoice != null) {
+      if (widget.existing != null) {
         await Supabase.instance.client
             .from('invoices')
             .update(data)
-            .eq('id', widget.existingInvoice!.id);
+            .eq('id', widget.existing!.id);
       } else {
         await Supabase.instance.client.from('invoices').insert(data);
       }
@@ -1101,957 +529,859 @@ class _InvoiceFormState extends State<InvoiceForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          widget.existingInvoice != null ? 'Editar Cuenta' : 'Nueva Cuenta',
+          widget.existing != null ? 'Editar Documento' : 'Registrar Cuenta',
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _docCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nº Doc',
-                      prefixIcon: Icon(Icons.tag),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sectionHeader('DATOS GENERALES'),
+                        // TARJETA MANUAL PARA "CLEAN UI"
+                        Card(
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                Autocomplete<String>(
+                                  optionsBuilder: (v) => v.text.isEmpty
+                                      ? const Iterable.empty()
+                                      : _provs.where(
+                                          (p) => p.toLowerCase().contains(
+                                            v.text.toLowerCase(),
+                                          ),
+                                        ),
+                                  onSelected: (v) => setState(() {
+                                    _selectedProv = v;
+                                    _provCtrl.text = v;
+                                  }),
+                                  fieldViewBuilder: (ctx, ctrl, focus, onSub) {
+                                    if (ctrl.text.isEmpty &&
+                                        _provCtrl.text.isNotEmpty)
+                                      ctrl.text = _provCtrl.text;
+                                    ctrl.addListener(() {
+                                      _selectedProv = ctrl.text;
+                                      _provCtrl.text = ctrl.text;
+                                    });
+                                    return TextFormField(
+                                      controller: ctrl,
+                                      focusNode: focus,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Proveedor',
+                                        hintText: 'Ej. Polar',
+                                        prefixIcon: Icon(
+                                          Icons.storefront_outlined,
+                                        ),
+                                      ),
+                                      validator: (v) =>
+                                          v!.isEmpty ? 'Requerido' : null,
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _docCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Nº Documento',
+                                          prefixIcon: Icon(Icons.tag),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: _buildDateInput()),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+                        _sectionHeader('MONTOS'),
+                        Card(
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                SegmentedButton<String>(
+                                  segments: const [
+                                    ButtonSegment(
+                                      value: 'Factura',
+                                      label: Text('Factura'),
+                                    ),
+                                    ButtonSegment(
+                                      value: 'Nota',
+                                      label: Text('Nota Entrega'),
+                                    ),
+                                  ],
+                                  selected: {_type},
+                                  onSelectionChanged:
+                                      (Set<String> newSelection) {
+                                        setState(() {
+                                          _type = newSelection.first;
+                                          if (_type == 'Nota') {
+                                            _iva = false;
+                                            _ret = false;
+                                            _ivaCtrl.clear();
+                                          } else {
+                                            _iva = true;
+                                            _onBaseAmountChanged();
+                                          }
+                                          _updatePreview();
+                                        });
+                                      },
+                                  style: ButtonStyle(
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    side: MaterialStateProperty.all(
+                                      BorderSide(
+                                        color: AppColors.primary.withOpacity(
+                                          0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 100,
+                                      child: DropdownButtonFormField<String>(
+                                        value: _currency,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Moneda',
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 16,
+                                          ),
+                                        ),
+                                        items: ['USD', 'Bs']
+                                            .map(
+                                              (c) => DropdownMenuItem(
+                                                value: c,
+                                                child: Text(
+                                                  c,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (v) =>
+                                            setState(() => _currency = v!),
+                                      ),
+                                    ),
+                                    if (_currency == 'Bs') ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: _rateCtrl,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            DecimalInputFormatter(),
+                                          ],
+                                          decoration: const InputDecoration(
+                                            labelText: 'Tasa (Bs)',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _baseCtrl,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [DecimalInputFormatter()],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Monto Base',
+                                    prefixText: _currency == 'USD'
+                                        ? '\$ '
+                                        : 'Bs ',
+                                  ),
+                                  onChanged: (_) => _updatePreview(),
+                                  validator: (v) =>
+                                      v!.isEmpty ? 'Requerido' : null,
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _taxCtrl,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [DecimalInputFormatter()],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Impuesto Licor (Opcional)',
+                                    prefixIcon: Icon(Icons.liquor_outlined),
+                                  ),
+                                  onChanged: (_) => _updatePreview(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (_type == 'Factura') ...[
+                          const SizedBox(height: 24),
+                          _sectionHeader('IMPUESTOS'),
+                          Card(
+                            color: Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(
+                                color: AppColors.border,
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                children: [
+                                  CheckboxListTile(
+                                    title: const Text(
+                                      "Aplicar IVA (16%)",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    value: _iva,
+                                    contentPadding: EdgeInsets.zero,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    onChanged: (v) => setState(() {
+                                      _iva = v!;
+                                      if (_iva)
+                                        _onBaseAmountChanged();
+                                      else {
+                                        _ivaCtrl.clear();
+                                        _ret = false;
+                                      }
+                                      _updatePreview();
+                                    }),
+                                  ),
+                                  if (_iva) ...[
+                                    TextFormField(
+                                      controller: _ivaCtrl,
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        DecimalInputFormatter(),
+                                      ],
+                                      decoration: const InputDecoration(
+                                        labelText: 'Monto IVA',
+                                        prefixIcon: Icon(Icons.percent),
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() => _manualIvaEdit = true);
+                                        _updatePreview();
+                                      },
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SwitchListTile(
+                                      title: const Text(
+                                        'Retención IVA (75%)',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: const Text(
+                                        'Contribuyente Especial',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textGrey,
+                                        ),
+                                      ),
+                                      value: _ret,
+                                      activeColor: AppColors.warning,
+                                      contentPadding: EdgeInsets.zero,
+                                      onChanged: (v) => setState(() {
+                                        _ret = v;
+                                        _updatePreview();
+                                      }),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        _sectionHeader('OBSERVACIONES'),
+                        Card(
+                          color: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                              color: AppColors.border,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: TextFormField(
+                              controller: _noteCtrl,
+                              maxLines: 3,
+                              decoration: const InputDecoration(
+                                hintText:
+                                    'Notas adicionales (Ej: Compra de vinos, Reparación)...',
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 100),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                        initialDate: _selectedDate,
-                      );
-                      if (picked != null)
-                        setState(() => _selectedDate = picked);
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Fecha',
-                        prefixIcon: Icon(Icons.calendar_today),
-                      ),
-                      child: Text(
-                        DateFormat('dd/MM/yyyy').format(_selectedDate),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text == '') {
-                  return const Iterable<String>.empty();
-                }
-                return _providersList.where((String option) {
-                  return option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                });
-              },
-              onSelected: (String selection) {
-                setState(() {
-                  _selectedProvider = selection;
-                  _providerTypeAheadCtrl.text = selection;
-                });
-              },
-              fieldViewBuilder:
-                  (context, controller, focusNode, onEditingComplete) {
-                    if (controller.text.isEmpty &&
-                        _providerTypeAheadCtrl.text.isNotEmpty) {
-                      controller.text = _providerTypeAheadCtrl.text;
-                    }
-                    controller.addListener(() {
-                      _selectedProvider = controller.text;
-                      _providerTypeAheadCtrl.text = controller.text;
-                    });
-
-                    return TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onEditingComplete: onEditingComplete,
-                      decoration: const InputDecoration(
-                        labelText: 'Proveedor',
-                        prefixIcon: Icon(Icons.store),
-                        hintText: 'Escribe para buscar...',
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Requerido' : null,
-                    );
-                  },
-            ),
-
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _type,
-                    decoration: const InputDecoration(labelText: 'Tipo'),
-                    items: ['Factura', 'Nota']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (v) => setState(() {
-                      _type = v!;
-                      if (_type == 'Nota') {
-                        _hasIva = false;
-                        _retentionApplies = false;
-                        _ivaCtrl.text = '0.00';
-                      }
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _currency,
-                    decoration: const InputDecoration(labelText: 'Moneda'),
-                    items: ['USD', 'Bs']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _currency = v!),
-                  ),
-                ),
-              ],
-            ),
-            if (_currency == 'Bs') ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _rateCtrl,
-                inputFormatters: [DecimalInputFormatter()],
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Tasa de Cambio',
-                  suffixText: 'Bs/\$',
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _baseCtrl,
-              inputFormatters: [DecimalInputFormatter()],
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                labelText: 'Monto Base (Subtotal)',
-                prefixText: _currency == 'USD' ? '\$ ' : 'Bs ',
-              ),
-              onChanged: (_) => _calculateIva(),
-              validator: (v) => v!.isEmpty ? 'Requerido' : null,
-            ),
-
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _liquorTaxCtrl,
-              inputFormatters: [DecimalInputFormatter()],
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Impuesto al Licor (Opcional)',
-                prefixIcon: const Icon(Icons.liquor),
-                prefixText: _currency == 'USD' ? '\$ ' : 'Bs ',
-                helperText: 'Impuesto adicional fuera de la base imponible',
               ),
             ),
-
-            if (_type == 'Factura') ...[
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(12),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Aplica IVA (16%)',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                    if (_ret)
+                      Text(
+                        "- Retención: ${NumberFormat("#,##0.00").format(_prevRetAmount)}",
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      value: _hasIva,
-                      onChanged: (v) => setState(() {
-                        _hasIva = v;
-                        _calculateIva();
-                      }),
+                    const Text(
+                      'TOTAL A PAGAR',
+                      style: TextStyle(
+                        color: AppColors.textGrey,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    if (_hasIva) ...[
-                      TextFormField(
-                        controller: _ivaCtrl,
-                        inputFormatters: [DecimalInputFormatter()],
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Monto IVA',
-                          fillColor: Colors.white,
-                        ),
+                    Text(
+                      '$_currency ${NumberFormat("#,##0.00").format(_prevTotal)}',
+                      style: const TextStyle(
+                        color: AppColors.textDark,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
                       ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Retención 75%'),
-                        subtitle: const Text('Contribuyente Especial'),
-                        value: _retentionApplies,
-                        onChanged: (v) => setState(() => _retentionApplies = v),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _notesCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Notas',
-                prefixIcon: Icon(Icons.note),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _loading ? null : _save,
-              child: _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('GUARDAR CUENTA'),
-            ),
-
-            // ELIMINAR DESDE FORMULARIO (MANTENEMOS ESTA OPCIÓN TAMBIÉN)
-            if (widget.existingInvoice != null) ...[
-              const SizedBox(height: 16),
-              TextButton.icon(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text(
-                  'Eliminar Factura',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onPressed: () async {
-                  final confirm = await showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('¿Eliminar Factura?'),
-                      content: const Text(
-                        'Esta acción borrará la factura y todos sus abonos. No se puede deshacer.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancelar'),
+              ElevatedButton.icon(
+                onPressed: _loading ? null : _save,
+                icon: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text(
-                            'Eliminar',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (confirm == true) {
-                    setState(() => _loading = true);
-                    await Supabase.instance.client
-                        .from('invoices')
-                        .delete()
-                        .eq('id', widget.existingInvoice!.id);
-                    if (mounted) Navigator.pop(context);
-                  }
-                },
+                      )
+                    : const Icon(Icons.check),
+                label: const Text('GUARDAR'),
               ),
             ],
-            const SizedBox(height: 30),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textGrey,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateInput() {
+    return InkWell(
+      onTap: () async {
+        final d = await showDatePicker(
+          context: context,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
+          initialDate: _date,
+          locale: const Locale('es'),
+        );
+        if (d != null) setState(() => _date = d);
+      },
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Fecha',
+          prefixIcon: Icon(Icons.calendar_today_outlined),
+        ),
+        child: Text(
+          DateFormat('dd MMM yyyy', 'es').format(_date),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
     );
   }
 }
 
-// --- CONFIGURACIÓN ---
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+// D. DASHBOARD
+class DashboardView extends StatelessWidget {
+  const DashboardView({super.key});
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  Widget build(BuildContext context) {
+    final stream = Supabase.instance.client
+        .from('invoices')
+        .stream(primaryKey: ['id'])
+        .asyncMap((invoices) async {
+          final withPayments = await Future.wait(
+            invoices.map((inv) async {
+              final payments = await Supabase.instance.client
+                  .from('payments')
+                  .select('amount')
+                  .eq('invoice_id', inv['id']);
+              double paid = 0;
+              for (var p in payments) paid += (p['amount'] as num).toDouble();
+              return {...inv, 'paid': paid};
+            }),
+          );
+          return withPayments;
+        });
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Panel Principal')),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+
+          double debtUSD = 0;
+          int count = 0;
+          Map<String, double> topDebtors = {};
+
+          for (var item in snapshot.data!) {
+            final inv = Invoice.fromMap(item);
+            final balance = inv.totalPayable - (item['paid'] as num).toDouble();
+            if (balance > 0.01) {
+              double usd = (inv.currency == 'USD')
+                  ? balance
+                  : (inv.exchangeRate != null && inv.exchangeRate! > 0)
+                  ? balance / inv.exchangeRate!
+                  : 0;
+              debtUSD += usd;
+              count++;
+              topDebtors[inv.provider] = (topDebtors[inv.provider] ?? 0) + usd;
+            }
+          }
+          var sorted = topDebtors.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+          if (sorted.length > 5) sorted = sorted.sublist(0, 5);
+
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'DEUDA TOTAL (USD)',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '\$${NumberFormat("#,##0.00", "en_US").format(debtUSD)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '$count Facturas Pendientes',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: sorted.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              'Sin deudas pendientes',
+                              style: TextStyle(color: AppColors.textGrey),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: sorted.map((e) {
+                            final max = sorted.first.value;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        e.key,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '\$${NumberFormat("#,##0.00").format(e.value)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: e.value / max,
+                                      minHeight: 6,
+                                      color: AppColors.primary,
+                                      backgroundColor: AppColors.background,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InvoiceForm()),
+        ),
+        label: const Text('Nueva Factura'),
+        icon: const Icon(Icons.add),
+      ),
+    );
+  }
 }
 
-class _SettingsScreenState extends State<SettingsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+// E. LISTADO DE CUENTAS (CON VISUALIZACIÓN DE NOTAS)
+class InvoiceListView extends StatefulWidget {
+  final String? providerFilter;
+  const InvoiceListView({super.key, this.providerFilter});
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+  State<InvoiceListView> createState() => _InvoiceListViewState();
+}
+
+class _InvoiceListViewState extends State<InvoiceListView> {
+  final _supabase = Supabase.instance.client;
+  String _search = '';
 
   @override
   Widget build(BuildContext context) {
+    final stream = _supabase
+        .from('invoices')
+        .stream(primaryKey: ['id'])
+        .order('invoice_date', ascending: false)
+        .asyncMap((invoices) async {
+          final withPayments = await Future.wait(
+            invoices.map((inv) async {
+              final payments = await _supabase
+                  .from('payments')
+                  .select('amount')
+                  .eq('invoice_id', inv['id']);
+              double paid = 0;
+              for (var p in payments) paid += (p['amount'] as num).toDouble();
+              return {...inv, 'paid': paid};
+            }),
+          );
+          return withPayments;
+        });
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Proveedores'),
-            Tab(text: 'Métodos de Pago'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          GenericConfigList(tableName: 'providers', title: 'Proveedor'),
-          GenericConfigList(tableName: 'payment_methods', title: 'Método'),
-        ],
-      ),
-    );
-  }
-}
-
-class GenericConfigList extends StatefulWidget {
-  final String tableName;
-  final String title;
-  const GenericConfigList({
-    super.key,
-    required this.tableName,
-    required this.title,
-  });
-
-  @override
-  State<GenericConfigList> createState() => _GenericConfigListState();
-}
-
-class _GenericConfigListState extends State<GenericConfigList> {
-  final _textCtrl = TextEditingController();
-
-  Future<void> _addOrUpdate({int? id, String? currentName}) async {
-    _textCtrl.text = currentName ?? '';
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          id == null ? 'Agregar ${widget.title}' : 'Editar ${widget.title}',
-        ),
-        content: TextField(
-          controller: _textCtrl,
-          decoration: InputDecoration(labelText: 'Nombre del ${widget.title}'),
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (_textCtrl.text.isNotEmpty) {
-                try {
-                  if (id == null) {
-                    await Supabase.instance.client
-                        .from(widget.tableName)
-                        .insert({'name': _textCtrl.text});
-                  } else {
-                    await Supabase.instance.client
-                        .from(widget.tableName)
-                        .update({'name': _textCtrl.text})
-                        .eq('id', id);
-                  }
-                  if (mounted) Navigator.pop(context);
-                } catch (e) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
-      ),
-    );
-    _textCtrl.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final stream = Supabase.instance.client
-        .from(widget.tableName)
-        .stream(primaryKey: ['id'])
-        .order('name');
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: FilledButton.icon(
-            onPressed: () => _addOrUpdate(),
-            icon: const Icon(Icons.add),
-            label: Text('Agregar Nuevo ${widget.title}'),
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: stream,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData)
-                return const Center(child: CircularProgressIndicator());
-              final items = snapshot.data!;
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: ListTile(
-                      title: Text(item['name']),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () => _addOrUpdate(
-                              id: item['id'],
-                              currentName: item['name'],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            onPressed: () async {
-                              final confirm = await showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('¿Eliminar?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: const Text('Sí'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirm == true)
-                                await Supabase.instance.client
-                                    .from(widget.tableName)
-                                    .delete()
-                                    .eq('id', item['id']);
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// --- MODAL DE PAGO (CREAR / EDITAR) ---
-class PaymentDialog extends StatefulWidget {
-  final Invoice invoice;
-  final double maxAmount;
-  final Map<String, dynamic>? existingPayment;
-
-  const PaymentDialog({
-    super.key,
-    required this.invoice,
-    required this.maxAmount,
-    this.existingPayment,
-  });
-  @override
-  State<PaymentDialog> createState() => _PaymentDialogState();
-}
-
-class _PaymentDialogState extends State<PaymentDialog> {
-  final _amountCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController(); // NUEVO: Controlador para nota
-  String? _method;
-  DateTime _paymentDate = DateTime.now();
-  List<String> _methodsList = [];
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchMethods();
-    if (widget.existingPayment != null) {
-      _amountCtrl.text = widget.existingPayment!['amount'].toString();
-      _paymentDate = DateTime.parse(widget.existingPayment!['payment_date']);
-      _method = widget.existingPayment!['method'];
-      _noteCtrl.text =
-          widget.existingPayment!['note'] ?? ''; // Cargar nota existente
-    }
-  }
-
-  Future<void> _fetchMethods() async {
-    final res = await Supabase.instance.client
-        .from('payment_methods')
-        .select()
-        .order('name');
-    setState(() {
-      _methodsList = (res as List).map((e) => e['name'] as String).toList();
-      if (_method == null && _methodsList.isNotEmpty) _method = _methodsList[0];
-    });
-  }
-
-  Future<void> _pay() async {
-    if (_amountCtrl.text.isEmpty || _method == null) return;
-    setState(() => _loading = true);
-    try {
-      final paymentData = {
-        'invoice_id': widget.invoice.id,
-        'amount': double.parse(_amountCtrl.text),
-        'method': _method,
-        'payment_date': _paymentDate.toIso8601String(),
-        'note': _noteCtrl.text, // GUARDAR NOTA
-      };
-
-      if (widget.existingPayment != null) {
-        await Supabase.instance.client
-            .from('payments')
-            .update(paymentData)
-            .eq('id', widget.existingPayment!['id']);
-      } else {
-        await Supabase.instance.client.from('payments').insert(paymentData);
-      }
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    bool isEditing = widget.existingPayment != null;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            isEditing ? 'Editar Abono' : 'Registrar Abono',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-
-          if (!isEditing)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'Deuda Pendiente',
-                    style: TextStyle(color: Colors.green),
-                  ),
-                  Text(
-                    '${widget.invoice.currency} ${widget.maxAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 20),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-                initialDate: _paymentDate,
-              );
-              if (picked != null) setState(() => _paymentDate = picked);
-            },
-            child: InputDecorator(
+        title: Text(widget.providerFilter ?? 'Cuentas'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: TextField(
               decoration: const InputDecoration(
-                labelText: 'Fecha del Abono',
-                prefixIcon: Icon(Icons.calendar_today),
+                hintText: 'Buscar...',
+                prefixIcon: Icon(Icons.search),
               ),
-              child: Text(DateFormat('dd/MM/yyyy').format(_paymentDate)),
+              onChanged: (v) => setState(() => _search = v.toLowerCase()),
             ),
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _amountCtrl,
-            inputFormatters: [DecimalInputFormatter()],
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              labelText: 'Monto a Abonar',
-              prefixText: widget.invoice.currency == 'USD' ? '\$ ' : 'Bs ',
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _method,
-            items: _methodsList
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                .toList(),
-            onChanged: (v) => setState(() => _method = v),
-            decoration: const InputDecoration(labelText: 'Método de Pago'),
-            hint: const Text('Cargando métodos...'),
-          ),
-          const SizedBox(height: 16),
-          // NUEVO CAMPO DE NOTA
-          TextField(
-            controller: _noteCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Nota del Abono (Opcional)',
-              prefixIcon: Icon(Icons.note),
-            ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _loading ? null : _pay,
-            child: Text(isEditing ? 'GUARDAR CAMBIOS' : 'REGISTRAR PAGO'),
-          ),
-        ],
+        ),
       ),
-    );
-  }
-}
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          final filtered = snapshot.data!.where((item) {
+            final inv = Invoice.fromMap(item);
+            if (widget.providerFilter != null &&
+                inv.provider != widget.providerFilter)
+              return false;
+            if (_search.isNotEmpty)
+              return inv.provider.toLowerCase().contains(_search) ||
+                  (inv.docNumber ?? '').toLowerCase().contains(_search);
+            return true;
+          }).toList();
 
-// --- DETALLE DE FACTURA E HISTORIAL ACTUALIZADO ---
-class InvoiceDetailDialog extends StatelessWidget {
-  final Invoice invoice;
-  const InvoiceDetailDialog({super.key, required this.invoice});
+          if (filtered.isEmpty)
+            return const Center(
+              child: Text(
+                'Sin registros',
+                style: TextStyle(color: Colors.grey),
+              ),
+            );
 
-  @override
-  Widget build(BuildContext context) {
-    final stream = Supabase.instance.client
-        .from('payments')
-        .stream(primaryKey: ['id'])
-        .eq('invoice_id', invoice.id)
-        .order('payment_date', ascending: false);
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = filtered[index];
+              final inv = Invoice.fromMap(item);
+              final paid = (item['paid'] as num).toDouble();
+              final balance = inv.totalPayable - paid;
+              final isPaid = balance <= 0.01;
 
-    final double totalFacial = invoice.type == 'Nota'
-        ? invoice.baseAmount
-        : invoice.baseAmount + invoice.manualIva + invoice.liquorTax;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 800),
-        child: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: stream,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData)
-              return const Padding(
-                padding: EdgeInsets.all(50),
-                child: Center(child: CircularProgressIndicator()),
-              );
-
-            final payments = snapshot.data!;
-            double totalPaid = 0;
-            for (var p in payments) {
-              totalPaid += (p['amount'] as num).toDouble();
-            }
-            final double remainingBalance = invoice.totalPayable - totalPaid;
-            final bool isPaid = remainingBalance <= 0.01;
-
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              invoice.provider,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (invoice.docNumber != null)
-                              Text(
-                                'Doc: ${invoice.docNumber}',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
+              return Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: InkWell(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => InvoiceDetailDialog(invoice: inv),
                   ),
-                  const Divider(),
-
-                  Container(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100),
-                    ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _row(
-                          'Base Imponible (+)',
-                          invoice.baseAmount,
-                          invoice.currency,
-                        ),
-                        if (invoice.type == 'Factura' && invoice.hasIva)
-                          _row(
-                            'IVA 16% (+)',
-                            invoice.manualIva,
-                            invoice.currency,
-                          ),
-
-                        if (invoice.liquorTax > 0)
-                          _row(
-                            'Impuesto Licor (+)',
-                            invoice.liquorTax,
-                            invoice.currency,
-                            color: Colors.purple,
-                          ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Divider(),
-                        ),
-                        _row(
-                          'Total Facial (=)',
-                          totalFacial,
-                          invoice.currency,
-                          isBold: true,
-                        ),
-
-                        if (invoice.type == 'Factura' &&
-                            invoice.retentionApplies &&
-                            invoice.hasIva) ...[
-                          const SizedBox(height: 8),
-                          _row(
-                            'Retención IVA 75% (-)',
-                            -invoice.retentionAmount,
-                            invoice.currency,
-                            color: Colors.orange[800]!,
-                          ),
-                        ],
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Divider(thickness: 2),
-                        ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'TOTAL A PAGAR:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF1565C0),
-                                fontSize: 12,
+                            Text(
+                              inv.provider,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: AppColors.textDark,
                               ),
                             ),
                             Text(
-                              '${invoice.currency} ${invoice.totalPayable.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
+                              '${inv.currency} ${NumberFormat("#,##0.00").format(balance)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Color(0xFF1565C0),
+                                color: isPaid
+                                    ? AppColors.success
+                                    : AppColors.error,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: isPaid ? Colors.green[100] : Colors.red[100],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          isPaid ? '¡FACTURA PAGADA!' : 'SALDO PENDIENTE',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isPaid ? Colors.green[800] : Colors.red[800],
-                          ),
-                        ),
-                        Text(
-                          '${invoice.currency} ${remainingBalance < 0 ? 0 : remainingBalance.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: isPaid ? Colors.green[900] : Colors.red[900],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Historial de Abonos',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 5),
-
-                  Expanded(
-                    child: payments.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Sin abonos registrados',
-                              style: TextStyle(color: Colors.grey),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              '${inv.type} #${inv.docNumber ?? "S/N"}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textGrey,
+                              ),
                             ),
-                          )
-                        : ListView.separated(
-                            shrinkWrap: true,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 1),
-                            itemCount: payments.length,
-                            itemBuilder: (context, index) {
-                              final p = payments[index];
-                              // VISUALIZACION DE NOTA EN ABONOS
-                              return ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                  size: 20,
+                            const Spacer(),
+                            Text(
+                              DateFormat('dd MMM', 'es').format(inv.date),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textGrey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // --- VISUALIZACIÓN DE NOTA ---
+                        if (inv.notes != null && inv.notes!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.description_outlined,
+                                  size: 14,
+                                  color: AppColors.textGrey,
                                 ),
-                                title: Text('${p['method']}'),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      DateFormat('dd MMM yyyy').format(
-                                        DateTime.parse(p['payment_date']),
-                                      ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    inv.notes!,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textGrey,
+                                      fontStyle: FontStyle.italic,
                                     ),
-                                    if (p['note'] != null &&
-                                        p['note'].toString().isNotEmpty)
-                                      Text(
-                                        p['note'],
-                                        style: const TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color: Colors.grey,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                  ],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '${(p['amount'] as num).toStringAsFixed(2)} ${invoice.currency}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                        fontSize: 14,
-                                      ),
+                              ],
+                            ),
+                          ),
+                        // ----------------------------
+                        if (!isPaid) ...[
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          InvoiceForm(existing: inv),
                                     ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 20,
-                                        color: Colors.red,
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () async {
-                                        final del = await showDialog(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            title: const Text(
-                                              '¿Eliminar abono?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(ctx, true),
-                                                child: const Text('Sí'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (del == true)
-                                          await Supabase.instance.client
-                                              .from('payments')
-                                              .delete()
-                                              .eq('id', p['id']);
-                                      },
-                                    ),
-                                  ],
+                                  ),
+                                  child: const Text('Editar'),
                                 ),
-                                onTap: () {
-                                  showModalBottomSheet(
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => showModalBottomSheet(
                                     context: context,
                                     isScrollControlled: true,
                                     builder: (ctx) => Padding(
@@ -2061,56 +1391,987 @@ class InvoiceDetailDialog extends StatelessWidget {
                                         ).viewInsets.bottom,
                                       ),
                                       child: PaymentDialog(
-                                        invoice: invoice,
-                                        maxAmount: 0,
-                                        existingPayment: p,
+                                        invoice: inv,
+                                        maxAmount: balance,
                                       ),
                                     ),
-                                  );
-                                },
-                              );
-                            },
+                                  ),
+                                  icon: const Icon(
+                                    Icons.attach_money,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Abonar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                        ],
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            );
-          },
-        ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
+}
 
-  Widget _row(
-    String label,
-    double amount,
-    String currency, {
-    bool isBold = false,
-    Color color = Colors.black87,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// F. MODAL PAGO
+class PaymentDialog extends StatefulWidget {
+  final Invoice invoice;
+  final double maxAmount;
+  final Map<String, dynamic>? existing;
+  const PaymentDialog({
+    super.key,
+    required this.invoice,
+    required this.maxAmount,
+    this.existing,
+  });
+  @override
+  State<PaymentDialog> createState() => _PaymentDialogState();
+}
+
+class _PaymentDialogState extends State<PaymentDialog> {
+  final _amt = TextEditingController();
+  final _note = TextEditingController();
+  String? _method;
+  DateTime _date = DateTime.now();
+  List<String> _methods = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMethods();
+    if (widget.existing != null) {
+      _amt.text = widget.existing!['amount'].toString();
+      _note.text = widget.existing!['note'] ?? '';
+      _method = widget.existing!['method'];
+      _date = DateTime.parse(widget.existing!['payment_date']);
+    }
+  }
+
+  Future<void> _loadMethods() async {
+    final r = await Supabase.instance.client
+        .from('payment_methods')
+        .select()
+        .order('name');
+    if (mounted)
+      setState(() {
+        _methods = (r as List).map((e) => e['name'] as String).toList();
+        if (_method == null && _methods.isNotEmpty) _method = _methods[0];
+      });
+  }
+
+  Future<void> _save() async {
+    if (_amt.text.isEmpty || _method == null) return;
+    setState(() => _loading = true);
+    final data = {
+      'invoice_id': widget.invoice.id,
+      'amount': double.parse(_amt.text.replaceAll(',', '.')),
+      'method': _method,
+      'payment_date': _date.toIso8601String(),
+      'note': _note.text,
+    };
+    if (widget.existing != null)
+      await Supabase.instance.client
+          .from('payments')
+          .update(data)
+          .eq('id', widget.existing!['id']);
+    else
+      await Supabase.instance.client.from('payments').insert(data);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            label,
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color,
-              fontSize: 13,
+            widget.existing != null ? 'Editar Pago' : 'Registrar Pago',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          if (widget.existing == null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'Pendiente por pagar',
+                    style: TextStyle(color: AppColors.success),
+                  ),
+                  Text(
+                    '${widget.invoice.currency} ${NumberFormat("#,##0.00").format(widget.maxAmount)}',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _amt,
+            keyboardType: TextInputType.number,
+            inputFormatters: [DecimalInputFormatter()],
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              labelText: 'Monto a Abonar',
+              prefixText: widget.invoice.currency == 'USD' ? '\$ ' : 'Bs ',
             ),
           ),
-          Text(
-            '$currency ${amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color,
-              fontSize: 13,
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                      initialDate: _date,
+                      locale: const Locale('es'),
+                    );
+                    if (d != null) setState(() => _date = d);
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Fecha',
+                      prefixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(DateFormat('dd MMM yyyy', 'es').format(_date)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _method,
+                  items: _methods
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _method = v),
+                  decoration: const InputDecoration(
+                    labelText: 'Método',
+                    prefixIcon: Icon(Icons.wallet),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _note,
+            decoration: const InputDecoration(
+              labelText: 'Nota (Opcional)',
+              prefixIcon: Icon(Icons.note),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loading ? null : _save,
+            child: Text(
+              widget.existing != null ? 'GUARDAR CAMBIOS' : 'PROCESAR PAGO',
             ),
           ),
         ],
       ),
     );
   }
+}
+
+// G. VISTA PROVEEDORES
+class ProvidersListView extends StatefulWidget {
+  const ProvidersListView({super.key});
+  @override
+  State<ProvidersListView> createState() => _ProvidersListViewState();
+}
+
+class _ProvidersListViewState extends State<ProvidersListView> {
+  final _supabase = Supabase.instance.client;
+  String _filter = '';
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Proveedores'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Filtrar...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (v) => setState(() => _filter = v.toLowerCase()),
+            ),
+          ),
+        ),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _supabase.from('invoices').stream(primaryKey: ['id']).asyncMap((
+          invoices,
+        ) async {
+          final withPayments = await Future.wait(
+            invoices.map((inv) async {
+              final payments = await _supabase
+                  .from('payments')
+                  .select('amount')
+                  .eq('invoice_id', inv['id']);
+              double paid = 0;
+              for (var p in payments) paid += (p['amount'] as num).toDouble();
+              return {...inv, 'paid': paid};
+            }),
+          );
+          return withPayments;
+        }),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          Map<String, Map<String, dynamic>> stats = {};
+          for (var item in snapshot.data!) {
+            final inv = Invoice.fromMap(item);
+            final balance = inv.totalPayable - (item['paid'] as num).toDouble();
+            if (!stats.containsKey(inv.provider))
+              stats[inv.provider] = {'usd': 0.0, 'count': 0};
+            if (balance > 0.01) {
+              double usd = (inv.currency == 'USD')
+                  ? balance
+                  : (inv.exchangeRate != null && inv.exchangeRate! > 0)
+                  ? balance / inv.exchangeRate!
+                  : 0;
+              stats[inv.provider]!['usd'] += usd;
+              stats[inv.provider]!['count'] += 1;
+            }
+          }
+          final list =
+              stats.entries
+                  .where((e) => e.key.toLowerCase().contains(_filter))
+                  .toList()
+                ..sort((a, b) => b.key.compareTo(a.key));
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final e = list[index];
+              return Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: ListTile(
+                  title: Text(
+                    e.key,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    e.value['count'] > 0
+                        ? '${e.value['count']} cuentas pendientes'
+                        : 'Al día',
+                  ),
+                  trailing: Text(
+                    '\$${NumberFormat("#,##0.00").format(e.value['usd'])}',
+                    style: TextStyle(
+                      color: e.value['usd'] > 0
+                          ? AppColors.error
+                          : AppColors.success,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => InvoiceListView(providerFilter: e.key),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// H. ABONOS GENERALES (CON VISUALIZACIÓN DE NOTAS)
+class PaymentsView extends StatefulWidget {
+  const PaymentsView({super.key});
+  @override
+  State<PaymentsView> createState() => _PaymentsViewState();
+}
+
+class _PaymentsViewState extends State<PaymentsView> {
+  final _supabase = Supabase.instance.client;
+  String _search = '';
+  @override
+  Widget build(BuildContext context) {
+    final stream = _supabase
+        .from('invoices')
+        .stream(primaryKey: ['id'])
+        .order('invoice_date', ascending: false)
+        .asyncMap((invoices) async {
+          final withPayments = await Future.wait(
+            invoices.map((inv) async {
+              final payments = await _supabase
+                  .from('payments')
+                  .select('amount')
+                  .eq('invoice_id', inv['id']);
+              double paid = 0;
+              for (var p in payments) paid += (p['amount'] as num).toDouble();
+              return {...inv, 'paid': paid};
+            }),
+          );
+          return withPayments;
+        });
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Realizar Abono'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Buscar cuenta...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (v) => setState(() => _search = v.toLowerCase()),
+            ),
+          ),
+        ),
+      ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          final filtered = snapshot.data!.where((item) {
+            final inv = Invoice.fromMap(item);
+            double paid = (item['paid'] as num).toDouble();
+            if ((inv.totalPayable - paid) <= 0.01) return false;
+            if (_search.isNotEmpty)
+              return inv.provider.toLowerCase().contains(_search);
+            return true;
+          }).toList();
+          if (filtered.isEmpty)
+            return const Center(
+              child: Text(
+                'No hay cuentas por cobrar',
+                style: TextStyle(color: Colors.grey),
+              ),
+            );
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = filtered[index];
+              final inv = Invoice.fromMap(item);
+              final paid = (item['paid'] as num).toDouble();
+              final balance = inv.totalPayable - paid;
+              return Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: ListTile(
+                  title: Text(
+                    inv.provider,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  // SUBTITULO MEJORADO CON NOTA
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${inv.type} #${inv.docNumber} • ${DateFormat('dd/MM').format(inv.date)}',
+                      ),
+                      if (inv.notes != null && inv.notes!.isNotEmpty)
+                        Text(
+                          inv.notes!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textGrey,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                  isThreeLine: inv.notes != null && inv.notes!.isNotEmpty,
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Debe: ${inv.currency} ${NumberFormat("#,##0.00").format(balance)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ),
+                  onTap: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (ctx) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                      ),
+                      child: PaymentDialog(invoice: inv, maxAmount: balance),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// I. CONFIGURACIÓN
+class SettingsView extends StatefulWidget {
+  const SettingsView({super.key});
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView>
+    with SingleTickerProviderStateMixin {
+  late TabController _tab;
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Configuración'),
+        bottom: TabBar(
+          controller: _tab,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textGrey,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(text: 'Proveedores'),
+            Tab(text: 'Métodos Pago'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tab,
+        children: const [
+          GenericConfigList(table: 'providers', label: 'Proveedor'),
+          GenericConfigList(table: 'payment_methods', label: 'Método'),
+        ],
+      ),
+    );
+  }
+}
+
+class GenericConfigList extends StatefulWidget {
+  final String table;
+  final String label;
+  const GenericConfigList({
+    super.key,
+    required this.table,
+    required this.label,
+  });
+  @override
+  State<GenericConfigList> createState() => _GenericConfigListState();
+}
+
+class _GenericConfigListState extends State<GenericConfigList> {
+  final _supabase = Supabase.instance.client;
+  void _upsert([int? id, String? name]) {
+    final ctrl = TextEditingController(text: name);
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('${id == null ? "Agregar" : "Editar"} ${widget.label}'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(labelText: 'Nombre'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (ctrl.text.isEmpty) return;
+              if (id == null)
+                await _supabase.from(widget.table).insert({'name': ctrl.text});
+              else
+                await _supabase
+                    .from(widget.table)
+                    .update({'name': ctrl.text})
+                    .eq('id', id);
+              if (mounted) Navigator.pop(c);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _supabase
+            .from(widget.table)
+            .stream(primaryKey: ['id'])
+            .order('name'),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: snapshot.data!.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, i) {
+              final item = snapshot.data![i];
+              return Card(
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: AppColors.border, width: 0.5),
+                ),
+                child: ListTile(
+                  title: Text(
+                    item['name'],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => _upsert(item['id'], item['name']),
+                        icon: const Icon(Icons.edit, color: AppColors.primary),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          await _supabase
+                              .from(widget.table)
+                              .delete()
+                              .eq('id', item['id']);
+                        },
+                        icon: const Icon(Icons.delete, color: AppColors.error),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _upsert(),
+        icon: const Icon(Icons.add),
+        label: Text('Agregar ${widget.label}'),
+      ),
+    );
+  }
+}
+
+// J. DETALLE FACTURA (CON CÁLCULO DE RESTANTE POR PAGAR)
+class InvoiceDetailDialog extends StatelessWidget {
+  final Invoice invoice;
+  const InvoiceDetailDialog({super.key, required this.invoice});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 800),
+        child: Column(
+          children: [
+            // Cabecera Azul
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          invoice.provider,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${invoice.type} #${invoice.docNumber ?? "S/N"}',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+
+            // Contenido con Stream de Pagos
+            Expanded(
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: Supabase.instance.client
+                    .from('payments')
+                    .stream(primaryKey: ['id'])
+                    .eq('invoice_id', invoice.id)
+                    .order('payment_date', ascending: false),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData)
+                    return const Center(child: CircularProgressIndicator());
+
+                  // Cálculos Financieros
+                  double paid = 0;
+                  for (var p in snapshot.data!)
+                    paid += (p['amount'] as num).toDouble();
+                  final balance = invoice.totalPayable - paid;
+                  final isPaid = balance <= 0.01;
+
+                  return ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      // --- RESUMEN FINANCIERO MEJORADO ---
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            _r('Base', invoice.baseAmount),
+                            if (invoice.liquorTax > 0)
+                              _r('Imp. Licor', invoice.liquorTax),
+                            if (invoice.hasIva)
+                              _r('IVA (16%)', invoice.manualIva),
+                            if (invoice.retentionAmount > 0) ...[
+                              const Divider(),
+                              _r(
+                                'Retención (-)',
+                                -invoice.retentionAmount,
+                                color: AppColors.error,
+                              ),
+                            ],
+                            const Divider(),
+                            _r(
+                              'TOTAL FACTURA',
+                              invoice.totalPayable,
+                              bold: true,
+                              size: 16,
+                            ),
+
+                            // SECCIÓN DE RESTANTE (Solo si hay abonos)
+                            if (paid > 0) ...[
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Divider(
+                                  thickness: 1,
+                                  color: AppColors.border,
+                                ),
+                              ),
+                              _r(
+                                'Abonado (-)',
+                                -paid,
+                                color: AppColors.success,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    "RESTANTE POR PAGAR",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      letterSpacing: 0.5,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  Text(
+                                    NumberFormat(
+                                      "#,##0.00",
+                                    ).format(balance < 0 ? 0 : balance),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 20,
+                                      color: isPaid
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // ----------------------------------------------------------------
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Historial de Pagos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  (isPaid
+                                          ? AppColors.success
+                                          : AppColors.warning)
+                                      .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              isPaid ? 'COMPLETADO' : 'PENDIENTE',
+                              style: TextStyle(
+                                color: isPaid
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (snapshot.data!.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(
+                            child: Text(
+                              'No se han registrado abonos',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                        )
+                      else
+                        ...snapshot.data!.map(
+                          (p) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: AppColors.success,
+                                size: 16,
+                              ),
+                            ),
+                            title: Text(
+                              p['method'] ?? 'Pago',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              DateFormat(
+                                'dd MMM yyyy',
+                                'es',
+                              ).format(DateTime.parse(p['payment_date'])),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${NumberFormat("#,##0.00").format(p['amount'])} ${invoice.currency}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.grey,
+                                    size: 20,
+                                  ),
+                                  onPressed: () async {
+                                    final c = await showDialog(
+                                      context: context,
+                                      builder: (d) => AlertDialog(
+                                        title: const Text('¿Eliminar pago?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(d, true),
+                                            child: const Text('Si'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(d, false),
+                                            child: const Text('No'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (c == true)
+                                      await Supabase.instance.client
+                                          .from('payments')
+                                          .delete()
+                                          .eq('id', p['id']);
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (ctx) => Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                ),
+                                child: PaymentDialog(
+                                  invoice: invoice,
+                                  maxAmount: 0,
+                                  existing: p,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+
+            // Botón de acción
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (ctx) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                      ),
+                      child: PaymentDialog(invoice: invoice, maxAmount: 0),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_card),
+                  label: const Text('REGISTRAR ABONO'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _r(
+    String l,
+    double v, {
+    bool bold = false,
+    Color? color,
+    double size = 14,
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          l,
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            fontSize: size,
+            color: AppColors.textDark,
+          ),
+        ),
+        Text(
+          NumberFormat("#,##0.00").format(v),
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            color: color ?? AppColors.textDark,
+            fontSize: size,
+          ),
+        ),
+      ],
+    ),
+  );
 }
