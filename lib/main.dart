@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'CUENTAS POR PAGAR',
+      title: 'Gestión Administrativa',
       debugShowCheckedModeBanner: false,
       // --- IDIOMA ESPAÑOL ---
       localizationsDelegates: const [
@@ -111,6 +111,10 @@ class MyApp extends StatelessWidget {
               fontSize: 16,
             ),
           ),
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
         ),
       ),
       home: const LoginScreen(),
@@ -240,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Icon(Icons.security, size: 64, color: AppColors.primary),
                 const SizedBox(height: 24),
                 const Text(
-                  'CUENTAS POR PAGAR',
+                  'Gestión Administrativa',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
@@ -295,7 +299,7 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _views = [
     const DashboardView(),
     const InvoiceListView(),
-    const PaymentsView(),
+    const PaymentsHistoryView(), // AHORA ES HISTORIAL
     const ProvidersListView(),
     const SettingsView(),
   ];
@@ -332,9 +336,9 @@ class _MainLayoutState extends State<MainLayout> {
                   label: Text('Cuentas'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.payments_outlined),
+                  icon: Icon(Icons.history_rounded),
                   label: Text('Abonos'),
-                ),
+                ), // Icono cambiado a historial
                 NavigationRailDestination(
                   icon: Icon(Icons.people_alt_rounded),
                   label: Text('Prov.'),
@@ -368,9 +372,9 @@ class _MainLayoutState extends State<MainLayout> {
               label: 'Cuentas',
             ),
             NavigationDestination(
-              icon: Icon(Icons.payments_outlined),
+              icon: Icon(Icons.history_rounded),
               label: 'Abonos',
-            ),
+            ), // Icono cambiado a historial
             NavigationDestination(
               icon: Icon(Icons.people_alt_rounded),
               label: 'Prov.',
@@ -1003,7 +1007,7 @@ class _InvoiceFormState extends State<InvoiceForm> {
   }
 }
 
-// D. DASHBOARD
+// D. DASHBOARD (CON BOTÓN FLOTANTE)
 class DashboardView extends StatelessWidget {
   const DashboardView({super.key});
   @override
@@ -1118,6 +1122,14 @@ class DashboardView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
+              const Text(
+                'Mayores Acreedores',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
               const SizedBox(height: 16),
               Card(
                 color: Colors.white,
@@ -1185,6 +1197,7 @@ class DashboardView extends StatelessWidget {
           );
         },
       ),
+      // --- BOTÓN FLOTANTE ---
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
@@ -1197,7 +1210,7 @@ class DashboardView extends StatelessWidget {
   }
 }
 
-// E. LISTADO DE CUENTAS
+// E. LISTADO DE CUENTAS (CON BOTÓN FLOTANTE)
 class InvoiceListView extends StatefulWidget {
   final String? providerFilter;
   const InvoiceListView({super.key, this.providerFilter});
@@ -1426,11 +1439,20 @@ class _InvoiceListViewState extends State<InvoiceListView> {
           );
         },
       ),
+      // --- BOTÓN FLOTANTE ---
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InvoiceForm()),
+        ),
+        label: const Text('Nueva Factura'),
+        icon: const Icon(Icons.add),
+      ),
     );
   }
 }
 
-// F. MODAL PAGO (REPARADO Y CON AUTO-RELLENADO)
+// F. MODAL PAGO (REPARADO)
 class PaymentDialog extends StatefulWidget {
   final Invoice invoice;
   final double maxAmount;
@@ -1457,7 +1479,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   void initState() {
     super.initState();
     _loadMethods();
-    // AUTO-RELLENAR: Si no es edición, ponemos el monto total pendiente
+    // AUTO-RELLENAR
     if (widget.existing != null) {
       _amt.text = widget.existing!['amount'].toString();
       _note.text = widget.existing!['note'] ?? '';
@@ -1615,7 +1637,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 }
 
-// G. VISTA PROVEEDORES
+// G. VISTA PROVEEDORES (CON BOTÓN FLOTANTE)
 class ProvidersListView extends StatefulWidget {
   const ProvidersListView({super.key});
   @override
@@ -1730,50 +1752,62 @@ class _ProvidersListViewState extends State<ProvidersListView> {
           );
         },
       ),
+      // --- BOTÓN FLOTANTE ---
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const InvoiceForm()),
+        ),
+        label: const Text('Nueva Factura'),
+        icon: const Icon(Icons.add),
+      ),
     );
   }
 }
 
-// H. ABONOS GENERALES
-class PaymentsView extends StatefulWidget {
-  const PaymentsView({super.key});
+// H. HISTORIAL DE PAGOS (NUEVA PESTAÑA ÚTIL)
+class PaymentsHistoryView extends StatefulWidget {
+  const PaymentsHistoryView({super.key});
   @override
-  State<PaymentsView> createState() => _PaymentsViewState();
+  State<PaymentsHistoryView> createState() => _PaymentsHistoryViewState();
 }
 
-class _PaymentsViewState extends State<PaymentsView> {
+class _PaymentsHistoryViewState extends State<PaymentsHistoryView> {
   final _supabase = Supabase.instance.client;
   String _search = '';
+
   @override
   Widget build(BuildContext context) {
+    // STREAM DE PAGOS REAL, UNIENDO DATOS DE LA FACTURA
     final stream = _supabase
-        .from('invoices')
+        .from('payments')
         .stream(primaryKey: ['id'])
-        .order('invoice_date', ascending: false)
-        .asyncMap((invoices) async {
-          final withPayments = await Future.wait(
-            invoices.map((inv) async {
-              final payments = await _supabase
-                  .from('payments')
-                  .select('amount')
-                  .eq('invoice_id', inv['id']);
-              double paid = 0;
-              for (var p in payments) paid += (p['amount'] as num).toDouble();
-              return {...inv, 'paid': paid};
+        .order('payment_date', ascending: false)
+        .asyncMap((payments) async {
+          // Enriquecemos cada pago con la info de su factura para saber a quién se le pagó
+          final enriched = await Future.wait(
+            payments.map((p) async {
+              final invData = await _supabase
+                  .from('invoices')
+                  .select()
+                  .eq('id', p['invoice_id'])
+                  .single();
+              return {...p, 'invoice': invData};
             }),
           );
-          return withPayments;
+          return enriched;
         });
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Realizar Abono'),
+        title: const Text('Historial de Abonos'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               decoration: const InputDecoration(
-                hintText: 'Buscar cuenta...',
+                hintText: 'Buscar abono...',
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (v) => setState(() => _search = v.toLowerCase()),
@@ -1786,30 +1820,38 @@ class _PaymentsViewState extends State<PaymentsView> {
         builder: (context, snapshot) {
           if (!snapshot.hasData)
             return const Center(child: CircularProgressIndicator());
+
           final filtered = snapshot.data!.where((item) {
-            final inv = Invoice.fromMap(item);
-            double paid = (item['paid'] as num).toDouble();
-            if ((inv.totalPayable - paid) <= 0.01) return false;
-            if (_search.isNotEmpty)
-              return inv.provider.toLowerCase().contains(_search);
+            final invData = item['invoice'];
+            final provider = (invData['provider'] ?? '')
+                .toString()
+                .toLowerCase();
+            final method = (item['method'] ?? '').toString().toLowerCase();
+            if (_search.isNotEmpty) {
+              return provider.contains(_search) || method.contains(_search);
+            }
             return true;
           }).toList();
+
           if (filtered.isEmpty)
             return const Center(
               child: Text(
-                'No hay cuentas por cobrar',
+                'No hay abonos registrados',
                 style: TextStyle(color: Colors.grey),
               ),
             );
+
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: filtered.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final item = filtered[index];
-              final inv = Invoice.fromMap(item);
-              final paid = (item['paid'] as num).toDouble();
-              final balance = inv.totalPayable - paid;
+              final p = filtered[index];
+              final inv = p['invoice'];
+              final amount = (p['amount'] as num).toDouble();
+              final date = DateTime.parse(p['payment_date']);
+              final currency = inv['currency'] ?? 'USD';
+
               return Card(
                 color: Colors.white,
                 surfaceTintColor: Colors.transparent,
@@ -1819,56 +1861,58 @@ class _PaymentsViewState extends State<PaymentsView> {
                   side: const BorderSide(color: AppColors.border, width: 0.5),
                 ),
                 child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.payments_rounded,
+                      color: AppColors.success,
+                    ),
+                  ),
                   title: Text(
-                    inv.provider,
+                    inv['provider'] ?? 'Desconocido',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${inv.type} #${inv.docNumber} • ${DateFormat('dd/MM').format(inv.date)}',
+                        'Factura #${inv['doc_number']} • ${DateFormat('dd MMM yyyy', 'es').format(date)}',
                       ),
-                      if (inv.notes != null && inv.notes!.isNotEmpty)
+                      if (p['note'] != null && p['note'].toString().isNotEmpty)
                         Text(
-                          inv.notes!,
+                          p['note'],
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontStyle: FontStyle.italic,
                             color: AppColors.textGrey,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
-                  isThreeLine: inv.notes != null && inv.notes!.isNotEmpty,
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Debe: ${inv.currency} ${NumberFormat("#,##0.00").format(balance)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$currency ${NumberFormat("#,##0.00").format(amount)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppColors.success,
+                        ),
                       ),
-                    ),
-                  ),
-                  onTap: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (ctx) => Padding(
-                      padding: EdgeInsets.only(
-                        bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                      Text(
+                        p['method'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textGrey,
+                        ),
                       ),
-                      child: PaymentDialog(invoice: inv, maxAmount: balance),
-                    ),
+                    ],
                   ),
                 ),
               );
@@ -2034,7 +2078,7 @@ class _GenericConfigListState extends State<GenericConfigList> {
   }
 }
 
-// J. DETALLE FACTURA (CON ELIMINAR Y SUB-TOTALES)
+// J. DETALLE FACTURA (CON ELIMINAR, SUB-TOTALES Y BUG SALDO 0.00 CORREGIDO)
 class InvoiceDetailDialog extends StatelessWidget {
   final Invoice invoice;
   const InvoiceDetailDialog({super.key, required this.invoice});
@@ -2076,7 +2120,7 @@ class InvoiceDetailDialog extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Botón Eliminar
+                  // Botón Eliminar Factura
                   IconButton(
                     onPressed: () async {
                       final confirm = await showDialog(
